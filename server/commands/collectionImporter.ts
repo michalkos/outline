@@ -187,6 +187,30 @@ export default async function collectionImporter({
     }
   }
 
+  const promises = Object.keys(documents).map((k) => {
+    const document = documents[k];
+    const relativeLinks = [...document.text.matchAll(/]\((.\/.*.md)\)/g)].map(
+      (match) => "." + decodeURI(match[1])
+    );
+
+    relativeLinks.forEach((r) => {
+      const actualPath = path.resolve(k, r).replace(process.cwd() + "/", "");
+      const actualDocument = documents[actualPath];
+      if (actualDocument) {
+        document.text = document.text.replace(
+          encodeURI(r).slice(1),
+          actualDocument.url
+        );
+      }
+    });
+
+    return document.save({
+      fields: ["text"],
+    });
+  });
+
+  await Promise.all(promises);
+
   // reload collections to get document mapping
   for (const collection of values(collections)) {
     await collection.reload();

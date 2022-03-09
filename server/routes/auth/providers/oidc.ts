@@ -91,7 +91,7 @@ if (OIDC_CLIENT_ID) {
 
           const subdomain = domain.split(".")[0];
           const result = await accountProvisioner({
-            ip: req.ip,
+            ip: req?.ip && req.ip.split(":")[0],
             team: {
               // https://github.com/outline/outline/pull/2388#discussion_r681120223
               name: "Wiki",

@@ -5,6 +5,7 @@ import { pick } from "lodash";
 import Logger from "@server/logging/logger";
 import { User, Event, Team, Collection, View } from "@server/models";
 import { getCookieDomain } from "@server/utils/domains";
+import { normalizeIP } from "./ip";
 
 export function getAllowedDomains(): string[] {
   // GOOGLE_ALLOWED_DOMAINS included here for backwards compatability
@@ -50,7 +51,7 @@ export async function signIn(
   }
 
   // update the database when the user last signed in
-  user.updateSignedIn(ctx.request.ip);
+  user.updateSignedIn(normalizeIP(ctx.request.ip));
   // don't await event creation for a faster sign-in
   Event.create({
     name: "users.signin",
@@ -61,7 +62,7 @@ export async function signIn(
       name: user.name,
       service,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
   const domain = getCookieDomain(ctx.request.hostname);
   const expires = addMonths(new Date(), 3);

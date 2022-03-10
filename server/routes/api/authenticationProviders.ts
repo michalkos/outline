@@ -6,6 +6,7 @@ import {
   presentAuthenticationProvider,
   presentPolicies,
 } from "@server/presenters";
+import { normalizeIP } from "@server/utils/ip";
 import { assertUuid, assertPresent } from "@server/validation";
 import allAuthenticationProviders from "../auth/providers";
 
@@ -47,7 +48,7 @@ router.post("authenticationProviders.update", auth(), async (ctx) => {
     modelId: id,
     teamId: user.teamId,
     actorId: user.id,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {

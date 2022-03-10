@@ -4,6 +4,7 @@ import { Event } from "@server/models";
 import Integration from "@server/models/Integration";
 import { authorize } from "@server/policies";
 import { presentIntegration } from "@server/presenters";
+import { normalizeIP } from "@server/utils/ip";
 import { assertSort, assertUuid, assertArray } from "@server/validation";
 import pagination from "./middlewares/pagination";
 
@@ -70,7 +71,7 @@ router.post("integrations.delete", auth(), async (ctx) => {
     modelId: integration.id,
     teamId: integration.teamId,
     actorId: user.id,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {

@@ -10,6 +10,7 @@ import {
 } from "@server/errors";
 import passportMiddleware from "@server/middlewares/passport";
 import { isDomainAllowed } from "@server/utils/authentication";
+import { normalizeIP } from "@server/utils/ip";
 import { StateStore, request } from "@server/utils/passport";
 
 const router = new Router();
@@ -91,7 +92,7 @@ if (OIDC_CLIENT_ID) {
 
           const subdomain = domain.split(".")[0];
           const result = await accountProvisioner({
-            ip: req?.ip && req.ip.split(":")[0],
+            ip: normalizeIP(req.ip),
             team: {
               // https://github.com/outline/outline/pull/2388#discussion_r681120223
               name: "Wiki",

@@ -12,6 +12,7 @@ import {
   presentPolicies,
 } from "@server/presenters";
 import { starIndexing } from "@server/utils/indexing";
+import { normalizeIP } from "@server/utils/ip";
 import { assertUuid, assertIndexCharacters } from "@server/validation";
 import pagination from "./middlewares/pagination";
 
@@ -35,7 +36,7 @@ router.post("stars.create", auth(), async (ctx) => {
   const star = await starCreator({
     user,
     documentId,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
     index,
   });
 
@@ -106,7 +107,7 @@ router.post("stars.update", auth(), async (ctx) => {
   star = await starUpdater({
     user,
     star,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
     index,
   });
 
@@ -124,7 +125,7 @@ router.post("stars.delete", auth(), async (ctx) => {
   const star = await Star.findByPk(id);
   authorize(user, "delete", star);
 
-  await starDestroyer({ user, star, ip: ctx.request.ip });
+  await starDestroyer({ user, star, ip: normalizeIP(ctx.request.ip) });
 
   ctx.body = {
     success: true,

@@ -5,6 +5,7 @@ import { NotFoundError, ValidationError } from "@server/errors";
 import auth from "@server/middlewares/authentication";
 import { Attachment, Document, Event } from "@server/models";
 import { authorize } from "@server/policies";
+import { normalizeIP } from "@server/utils/ip";
 import {
   getPresignedPost,
   publicS3Endpoint,
@@ -75,7 +76,7 @@ router.post("attachments.create", auth(), async (ctx) => {
     },
     teamId: user.teamId,
     userId: user.id,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -122,7 +123,7 @@ router.post("attachments.delete", auth(), async (ctx) => {
     name: "attachments.delete",
     teamId: user.teamId,
     userId: user.id,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {

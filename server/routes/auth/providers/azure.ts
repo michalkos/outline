@@ -7,6 +7,7 @@ import accountProvisioner from "@server/commands/accountProvisioner";
 import env from "@server/env";
 import { MicrosoftGraphError } from "@server/errors";
 import passportMiddleware from "@server/middlewares/passport";
+import { normalizeIP } from "@server/utils/ip";
 import { StateStore, request } from "@server/utils/passport";
 
 const router = new Router();
@@ -82,7 +83,7 @@ if (AZURE_CLIENT_ID) {
         const subdomain = domain.split(".")[0];
         const teamName = organization.displayName;
         const result = await accountProvisioner({
-          ip: req.ip,
+          ip: normalizeIP(req.ip),
           team: {
             name: teamName,
             domain,

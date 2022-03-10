@@ -5,6 +5,7 @@ import auth from "@server/middlewares/authentication";
 import { Document, User, Event, Share, Team, Collection } from "@server/models";
 import { authorize } from "@server/policies";
 import { presentShare, presentPolicies } from "@server/presenters";
+import { normalizeIP } from "@server/utils/ip";
 import { assertUuid, assertSort, assertPresent } from "@server/validation";
 import pagination from "./middlewares/pagination";
 
@@ -203,7 +204,7 @@ router.post("shares.update", auth(), async (ctx) => {
     data: {
       published,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -248,7 +249,7 @@ router.post("shares.create", auth(), async (ctx) => {
       data: {
         name: document.title,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   }
 
@@ -289,7 +290,7 @@ router.post("shares.revoke", auth(), async (ctx) => {
     data: {
       name: document.title,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {

@@ -3,6 +3,7 @@ import auth from "@server/middlewares/authentication";
 import { View, Document, Event } from "@server/models";
 import { authorize } from "@server/policies";
 import { presentView } from "@server/presenters";
+import { normalizeIP } from "@server/utils/ip";
 import { assertUuid } from "@server/validation";
 
 const router = new Router();
@@ -47,7 +48,7 @@ router.post("views.create", auth(), async (ctx) => {
     data: {
       title: document.title,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
   view.user = user;
 

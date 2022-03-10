@@ -7,6 +7,7 @@ import auth from "@server/middlewares/authentication";
 import { FileOperation, Team } from "@server/models";
 import { authorize } from "@server/policies";
 import { presentFileOperation } from "@server/presenters";
+import { normalizeIP } from "@server/utils/ip";
 import { getSignedUrl } from "@server/utils/s3";
 import { assertPresent, assertIn, assertUuid } from "@server/validation";
 import pagination from "./middlewares/pagination";
@@ -106,7 +107,7 @@ router.post("fileOperations.delete", auth(), async (ctx) => {
   }
 
   authorize(user, fileOp.type, team);
-  await fileOperationDeleter(fileOp, user, ctx.request.ip);
+  await fileOperationDeleter(fileOp, user, normalizeIP(ctx.request.ip));
 
   ctx.body = {
     success: true,

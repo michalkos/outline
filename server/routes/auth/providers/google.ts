@@ -11,6 +11,7 @@ import {
 } from "@server/errors";
 import passportMiddleware from "@server/middlewares/passport";
 import { isDomainAllowed } from "@server/utils/authentication";
+import { normalizeIP } from "@server/utils/ip";
 import { StateStore } from "@server/utils/passport";
 
 const router = new Router();
@@ -54,7 +55,7 @@ if (GOOGLE_CLIENT_ID) {
           const subdomain = domain.split(".")[0];
           const teamName = capitalize(subdomain);
           const result = await accountProvisioner({
-            ip: req.ip,
+            ip: normalizeIP(req.ip),
             team: {
               name: teamName,
               domain,

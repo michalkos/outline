@@ -12,6 +12,7 @@ import {
   Integration,
   Team,
 } from "@server/models";
+import { normalizeIP } from "@server/utils/ip";
 import { StateStore } from "@server/utils/passport";
 import * as Slack from "@server/utils/slack";
 import { assertPresent, assertUuid } from "@server/validation";
@@ -46,7 +47,7 @@ if (SLACK_CLIENT_ID) {
     async function (req, accessToken, refreshToken, profile, done) {
       try {
         const result = await accountProvisioner({
-          ip: req.ip,
+          ip: normalizeIP(req.ip),
           team: {
             name: profile.team.name,
             subdomain: profile.team.domain,

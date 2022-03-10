@@ -4,6 +4,7 @@ import auth from "@server/middlewares/authentication";
 import { Team } from "@server/models";
 import { authorize } from "@server/policies";
 import { presentTeam, presentPolicies } from "@server/presenters";
+import { normalizeIP } from "@server/utils/ip";
 import { assertUuid } from "@server/validation";
 
 const router = new Router();
@@ -43,7 +44,7 @@ router.post("team.update", auth(), async (ctx) => {
     },
     user,
     team,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {

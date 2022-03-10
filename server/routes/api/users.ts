@@ -7,6 +7,7 @@ import auth from "@server/middlewares/authentication";
 import { Event, User, Team } from "@server/models";
 import { can, authorize } from "@server/policies";
 import { presentUser, presentPolicies } from "@server/presenters";
+import { normalizeIP } from "@server/utils/ip";
 import {
   assertIn,
   assertSort,
@@ -155,7 +156,7 @@ router.post("users.update", auth(), async (ctx) => {
     actorId: user.id,
     userId: user.id,
     teamId: user.teamId,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -183,7 +184,7 @@ router.post("users.promote", auth(), async (ctx) => {
     data: {
       name: user.name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
   const includeDetails = can(actor, "readDetails", user);
 
@@ -214,7 +215,7 @@ router.post("users.demote", auth(), async (ctx) => {
     data: {
       name: user.name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
   const includeDetails = can(actor, "readDetails", user);
 
@@ -236,7 +237,7 @@ router.post("users.suspend", auth(), async (ctx) => {
   await userSuspender({
     user,
     actorId: actor.id,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
   const includeDetails = can(actor, "readDetails", user);
 
@@ -265,7 +266,7 @@ router.post("users.activate", auth(), async (ctx) => {
     data: {
       name: user.name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
   const includeDetails = can(actor, "readDetails", user);
 
@@ -287,7 +288,7 @@ router.post("users.invite", auth(), async (ctx) => {
   const response = await userInviter({
     user,
     invites,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -312,7 +313,7 @@ router.post("users.delete", auth(), async (ctx) => {
   await userDestroyer({
     user,
     actor,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {

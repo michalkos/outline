@@ -3,6 +3,7 @@ import auth from "@server/middlewares/authentication";
 import { ApiKey, Event } from "@server/models";
 import { authorize } from "@server/policies";
 import { presentApiKey } from "@server/presenters";
+import { normalizeIP } from "@server/utils/ip";
 import { assertUuid, assertPresent } from "@server/validation";
 import pagination from "./middlewares/pagination";
 
@@ -27,7 +28,7 @@ router.post("apiKeys.create", auth(), async (ctx) => {
     data: {
       name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -68,7 +69,7 @@ router.post("apiKeys.delete", auth(), async (ctx) => {
     data: {
       name: key.name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {

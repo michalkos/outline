@@ -1,6 +1,7 @@
 import { Next } from "koa";
 import { User, Team, ApiKey } from "@server/models";
 import tracer from "@server/tracing";
+import { normalizeIP } from "@server/utils/ip";
 import { getUserForJWT } from "@server/utils/jwt";
 import { AuthenticationError, UserSuspendedError } from "../errors";
 import { ContextWithState } from "../types";
@@ -95,7 +96,7 @@ export default function auth(
       }
 
       // not awaiting the promise here so that the request is not blocked
-      user.updateActiveAt(ctx.request.ip);
+      user.updateActiveAt(normalizeIP(ctx.request.ip));
       ctx.state.token = String(token);
       ctx.state.user = user;
 

@@ -31,6 +31,7 @@ import {
   presentDocument,
   presentPolicies,
 } from "@server/presenters";
+import { normalizeIP } from "@server/utils/ip";
 import {
   assertUuid,
   assertSort,
@@ -692,7 +693,7 @@ router.post("documents.restore", auth(), async (ctx) => {
       data: {
         title: document.title,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   } else if (document.archivedAt) {
     authorize(user, "unarchive", document);
@@ -707,7 +708,7 @@ router.post("documents.restore", auth(), async (ctx) => {
       data: {
         title: document.title,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   } else if (revisionId) {
     // restore a document to a specific revision
@@ -728,7 +729,7 @@ router.post("documents.restore", auth(), async (ctx) => {
       data: {
         title: document.title,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   } else {
     assertPresent(revisionId, "revisionId is required");
@@ -896,7 +897,7 @@ router.post("documents.star", auth(), async (ctx) => {
     data: {
       title: document.title,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -930,7 +931,7 @@ router.post("documents.unstar", auth(), async (ctx) => {
     data: {
       title: document.title,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -970,7 +971,7 @@ router.post("documents.templatize", auth(), async (ctx) => {
       title: document.title,
       template: true,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   // reload to get all of the data needed to present (user, collection etc)
@@ -1075,7 +1076,7 @@ router.post("documents.update", auth(), async (ctx) => {
       data: {
         title: document.title,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   } else if (changed) {
     await Event.create({
@@ -1089,7 +1090,7 @@ router.post("documents.update", auth(), async (ctx) => {
         done,
         title: document.title,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   }
 
@@ -1104,7 +1105,7 @@ router.post("documents.update", auth(), async (ctx) => {
         previousTitle,
         title: document.title,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   }
 
@@ -1160,7 +1161,7 @@ router.post("documents.move", auth(), async (ctx) => {
     collectionId,
     parentDocumentId,
     index,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -1196,7 +1197,7 @@ router.post("documents.archive", auth(), async (ctx) => {
     data: {
       title: document.title,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -1238,7 +1239,7 @@ router.post("documents.delete", auth(), async (ctx) => {
       data: {
         title: document.title,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   } else {
     const document = await Document.findByPk(id, {
@@ -1257,7 +1258,7 @@ router.post("documents.delete", auth(), async (ctx) => {
       data: {
         title: document.title,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   }
 
@@ -1286,7 +1287,7 @@ router.post("documents.unpublish", auth(), async (ctx) => {
     data: {
       title: document.title,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -1348,7 +1349,7 @@ router.post("documents.import", auth(), async (ctx) => {
   const { text, title } = await documentImporter({
     user,
     file,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
   const document = await documentCreator({
     source: "import",
@@ -1359,7 +1360,7 @@ router.post("documents.import", auth(), async (ctx) => {
     parentDocumentId,
     index,
     user,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
   document.collection = collection;
 
@@ -1437,7 +1438,7 @@ router.post("documents.create", auth(), async (ctx) => {
     index,
     user,
     editorVersion,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
   document.collection = collection;
 

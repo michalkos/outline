@@ -12,6 +12,7 @@ import {
   presentDocument,
   presentPolicies,
 } from "@server/presenters";
+import { normalizeIP } from "@server/utils/ip";
 import { assertUuid, assertIndexCharacters } from "@server/validation";
 import pagination from "./middlewares/pagination";
 
@@ -46,7 +47,7 @@ router.post("pins.create", auth(), async (ctx) => {
     user,
     documentId,
     collectionId,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
     index,
   });
 
@@ -122,7 +123,7 @@ router.post("pins.update", auth(), async (ctx) => {
   pin = await pinUpdater({
     user,
     pin,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
     index,
   });
 
@@ -150,7 +151,7 @@ router.post("pins.delete", auth(), async (ctx) => {
     authorize(user, "delete", pin);
   }
 
-  await pinDestroyer({ user, pin, ip: ctx.request.ip });
+  await pinDestroyer({ user, pin, ip: normalizeIP(ctx.request.ip) });
 
   ctx.body = {
     success: true,

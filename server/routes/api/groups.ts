@@ -11,6 +11,7 @@ import {
   presentUser,
   presentGroupMembership,
 } from "@server/presenters";
+import { normalizeIP } from "@server/utils/ip";
 import { assertPresent, assertUuid, assertSort } from "@server/validation";
 import pagination from "./middlewares/pagination";
 
@@ -89,7 +90,7 @@ router.post("groups.create", auth(), async (ctx) => {
     data: {
       name: group.name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -119,7 +120,7 @@ router.post("groups.update", auth(), async (ctx) => {
       data: {
         name,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   }
 
@@ -146,7 +147,7 @@ router.post("groups.delete", auth(), async (ctx) => {
     data: {
       name: group.name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -243,7 +244,7 @@ router.post("groups.add_user", auth(), async (ctx) => {
       data: {
         name: user.name,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   }
 
@@ -277,7 +278,7 @@ router.post("groups.remove_user", auth(), async (ctx) => {
     data: {
       name: user.name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   // reload to get default scope

@@ -27,6 +27,7 @@ import {
   presentFileOperation,
 } from "@server/presenters";
 import { collectionIndexing } from "@server/utils/indexing";
+import { normalizeIP } from "@server/utils/ip";
 import removeIndexCollision from "@server/utils/removeIndexCollision";
 import {
   assertUuid,
@@ -103,7 +104,7 @@ router.post("collections.create", auth(), async (ctx) => {
     data: {
       name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
   // we must reload the collection to get memberships for policy presenter
   const reloaded = await Collection.scope({
@@ -149,7 +150,7 @@ router.post("collections.import", auth(), async (ctx) => {
     data: {
       type,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -198,7 +199,7 @@ router.post("collections.add_group", auth(), async (ctx) => {
       name: group.name,
       groupId,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -233,7 +234,7 @@ router.post("collections.remove_group", auth(), async (ctx) => {
       name: group.name,
       groupId,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -339,7 +340,7 @@ router.post("collections.add_user", auth(), async (ctx) => {
     data: {
       name: user.name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -373,7 +374,7 @@ router.post("collections.remove_user", auth(), async (ctx) => {
     data: {
       name: user.name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -466,7 +467,7 @@ router.post("collections.export", auth(), async (ctx) => {
     collection,
     user,
     team,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -485,7 +486,7 @@ router.post("collections.export_all", auth(), async (ctx) => {
   const fileOperation = await collectionExporter({
     user,
     team,
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -581,7 +582,7 @@ router.post("collections.update", auth(), async (ctx) => {
     data: {
       name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   if (privacyChanged || sharingChanged) {
@@ -594,7 +595,7 @@ router.post("collections.update", auth(), async (ctx) => {
         privacyChanged,
         sharingChanged,
       },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
     });
   }
 
@@ -610,7 +611,7 @@ router.post("collections.update", auth(), async (ctx) => {
     ) {
       await teamUpdater({
         params: { defaultCollectionId: null },
-        ip: ctx.request.ip,
+        ip: normalizeIP(ctx.request.ip),
         user,
         team,
       });
@@ -679,7 +680,7 @@ router.post("collections.delete", auth(), async (ctx) => {
   if (team && team.defaultCollectionId === collection.id) {
     await teamUpdater({
       params: { defaultCollectionId: null },
-      ip: ctx.request.ip,
+      ip: normalizeIP(ctx.request.ip),
       user,
       team,
     });
@@ -693,7 +694,7 @@ router.post("collections.delete", auth(), async (ctx) => {
     data: {
       name: collection.name,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {
@@ -724,7 +725,7 @@ router.post("collections.move", auth(), async (ctx) => {
     data: {
       index,
     },
-    ip: ctx.request.ip,
+    ip: normalizeIP(ctx.request.ip),
   });
 
   ctx.body = {

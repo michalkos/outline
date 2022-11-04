@@ -12,6 +12,7 @@ import {
   IsIn,
   BeforeDestroy,
   BeforeCreate,
+  BeforeValidate,
   AfterCreate,
   BelongsTo,
   ForeignKey,
@@ -583,6 +584,28 @@ class User extends ParanoidModel {
   static setRandomJwtSecret = (model: User) => {
     model.jwtSecret = crypto.randomBytes(64).toString("hex");
   };
+
+  @BeforeValidate
+  static cleanupIpV4(model: User) {
+    if (model.lastActiveIp) {
+      // cleanup port from IPV4
+      if (
+        model.lastActiveIp.includes(".") &&
+        model.lastActiveIp.includes(":")
+      ) {
+        model.lastActiveIp = model.lastActiveIp.split(":")[0];
+      }
+    }
+    if (model.lastSignedInIp) {
+      // cleanup port from IPV4
+      if (
+        model.lastSignedInIp.includes(".") &&
+        model.lastSignedInIp.includes(":")
+      ) {
+        model.lastSignedInIp = model.lastSignedInIp.split(":")[0];
+      }
+    }
+  }
 
   @AfterUpdate
   static deletePreviousAvatar = async (model: User) => {

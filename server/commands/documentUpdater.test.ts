@@ -7,7 +7,7 @@ import documentUpdater from "./documentUpdater";
 setupTestDatabase();
 
 describe("documentUpdater", () => {
-  const ip = "127.0.0.1";
+  const ip = "127.0.0.1:433";
 
   it("should change lastModifiedById", async () => {
     const user = await buildUser();

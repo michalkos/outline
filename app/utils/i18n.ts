@@ -7,10 +7,12 @@ import {
   it,
   ja,
   ko,
+  nl,
   ptBR,
   pt,
   pl,
   ru,
+  tr,
   vi,
   zhCN,
   zhTW,
@@ -25,10 +27,12 @@ const locales = {
   it_IT: it,
   ja_JP: ja,
   ko_KR: ko,
+  nl_NL: nl,
   pt_BR: ptBR,
   pt_PT: pt,
   pl_PL: pl,
   ru_RU: ru,
+  tr_TR: tr,
   vi_VN: vi,
   zh_CN: zhCN,
   zh_TW: zhTW,
@@ -37,3 +41,5 @@ const locales = {
 export function dateLocale(userLocale: string | null | undefined) {
   return userLocale ? locales[userLocale] : undefined;
 }
+
+export { locales };

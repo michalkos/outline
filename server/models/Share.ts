@@ -6,12 +6,13 @@ import {
   Table,
   Scopes,
   DataType,
+  Default,
 } from "sequelize-typescript";
 import Collection from "./Collection";
 import Document from "./Document";
 import Team from "./Team";
 import User from "./User";
-import BaseModel from "./base/BaseModel";
+import IdModel from "./base/IdModel";
 import Fix from "./decorators/Fix";
 
 @DefaultScope(() => ({
@@ -30,7 +31,7 @@ import Fix from "./decorators/Fix";
   ],
 }))
 @Scopes(() => ({
-  withCollection: (userId: string) => {
+  withCollectionPermissions: (userId: string) => {
     return {
       include: [
         {
@@ -39,6 +40,13 @@ import Fix from "./decorators/Fix";
           as: "document",
           include: [
             {
+              attributes: [
+                "id",
+                "permission",
+                "sharing",
+                "teamId",
+                "deletedAt",
+              ],
               model: Collection.scope({
                 method: ["withMembership", userId],
               }),
@@ -59,7 +67,7 @@ import Fix from "./decorators/Fix";
 }))
 @Table({ tableName: "shares", modelName: "share" })
 @Fix
-class Share extends BaseModel {
+class Share extends IdModel {
   @Column
   published: boolean;
 
@@ -72,10 +80,19 @@ class Share extends BaseModel {
   @Column
   lastAccessedAt: Date | null;
 
+  /** Total count of times the shared link has been accessed */
+  @Default(0)
+  @Column
+  views: number;
+
   // getters
 
   get isRevoked() {
     return !!this.revokedAt;
+  }
+
+  get canonicalUrl() {
+    return `${this.team.url}/s/${this.id}`;
   }
 
   // associations
@@ -102,7 +119,7 @@ class Share extends BaseModel {
   teamId: string;
 
   @BelongsTo(() => Document, "documentId")
-  document: Document;
+  document: Document | null;
 
   @ForeignKey(() => Document)
   @Column(DataType.UUID)

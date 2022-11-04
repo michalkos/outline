@@ -1,7 +1,9 @@
-import invariant from "invariant";
+import crypto from "crypto";
 import Router from "koa-router";
 import { escapeRegExp } from "lodash";
+import env from "@server/env";
 import { AuthenticationError, InvalidRequestError } from "@server/errors";
+import Logger from "@server/logging/Logger";
 import {
   UserAuthentication,
   AuthenticationProvider,
@@ -12,22 +14,40 @@ import {
   Integration,
   IntegrationAuthentication,
 } from "@server/models";
+import SearchHelper from "@server/models/helpers/SearchHelper";
 import { presentSlackAttachment } from "@server/presenters";
 import * as Slack from "@server/utils/slack";
 import { assertPresent } from "@server/validation";
 
 const router = new Router();
 
-// triggered by a user posting a getoutline.com link in Slack
-router.post("hooks.unfurl", async (ctx) => {
-  const { challenge, token, event } = ctx.body;
-  if (challenge) {
-    return (ctx.body = ctx.body.challenge);
+function verifySlackToken(token: string) {
+  if (!env.SLACK_VERIFICATION_TOKEN) {
+    throw AuthenticationError(
+      "SLACK_VERIFICATION_TOKEN is not present in environment"
+    );
   }
 
-  if (token !== process.env.SLACK_VERIFICATION_TOKEN) {
+  if (
+    token.length !== env.SLACK_VERIFICATION_TOKEN.length ||
+    !crypto.timingSafeEqual(
+      Buffer.from(env.SLACK_VERIFICATION_TOKEN),
+      Buffer.from(token)
+    )
+  ) {
     throw AuthenticationError("Invalid token");
   }
+}
+
+// triggered by a user posting a getoutline.com link in Slack
+router.post("hooks.unfurl", async (ctx) => {
+  const { challenge, token, event } = ctx.request.body;
+  if (challenge) {
+    return (ctx.body = ctx.request.body.challenge);
+  }
+
+  assertPresent(token, "token is required");
+  verifySlackToken(token);
 
   const user = await User.findOne({
     include: [
@@ -38,6 +58,7 @@ router.post("hooks.unfurl", async (ctx) => {
         model: UserAuthentication,
         as: "authentications",
         required: true,
+        separate: true,
       },
     ],
   });
@@ -65,7 +86,7 @@ router.post("hooks.unfurl", async (ctx) => {
     unfurls[link.url] = {
       title: doc.title,
       text: doc.getSummary(),
-      color: doc.collection.color,
+      color: doc.collection?.color,
     };
   }
 
@@ -75,11 +96,15 @@ router.post("hooks.unfurl", async (ctx) => {
     ts: event.message_ts,
     unfurls,
   });
+
+  ctx.body = {
+    success: true,
+  };
 });
 
 // triggered by interactions with actions, dialogs, message buttons in Slack
 router.post("hooks.interactive", async (ctx) => {
-  const { payload } = ctx.body;
+  const { payload } = ctx.request.body;
   assertPresent(payload, "payload is required");
 
   const data = JSON.parse(payload);
@@ -87,10 +112,7 @@ router.post("hooks.interactive", async (ctx) => {
 
   assertPresent(token, "token is required");
   assertPresent(callback_id, "callback_id is required");
-
-  if (token !== process.env.SLACK_VERIFICATION_TOKEN) {
-    throw AuthenticationError("Invalid verification token");
-  }
+  verifySlackToken(token);
 
   // we find the document based on the users teamId to ensure access
   const document = await Document.scope("withCollection").findByPk(
@@ -101,8 +123,7 @@ router.post("hooks.interactive", async (ctx) => {
     throw InvalidRequestError("Invalid callback_id");
   }
 
-  const team = await Team.findByPk(document.teamId);
-  invariant(team, "team not found");
+  const team = await Team.findByPk(document.teamId, { rejectOnEmpty: true });
 
   // respond with a public message that will be posted in the original channel
   ctx.body = {
@@ -111,8 +132,8 @@ router.post("hooks.interactive", async (ctx) => {
     attachments: [
       presentSlackAttachment(
         document,
-        document.collection,
         team,
+        document.collection,
         document.getSummary()
       ),
     ],
@@ -121,14 +142,11 @@ router.post("hooks.interactive", async (ctx) => {
 
 // triggered by the /outline command in Slack
 router.post("hooks.slack", async (ctx) => {
-  const { token, team_id, user_id, text = "" } = ctx.body;
+  const { token, team_id, user_id, text = "" } = ctx.request.body;
   assertPresent(token, "token is required");
   assertPresent(team_id, "team_id is required");
   assertPresent(user_id, "user_id is required");
-
-  if (token !== process.env.SLACK_VERIFICATION_TOKEN) {
-    throw AuthenticationError("Invalid verification token");
-  }
+  verifySlackToken(token);
 
   // Handle "help" command or no input
   if (text.trim() === "help" || !text.trim()) {
@@ -153,6 +171,7 @@ router.post("hooks.slack", async (ctx) => {
         where: {
           name: "slack",
           providerId: team_id,
+          enabled: true,
         },
         as: "authenticationProviders",
         model: AuthenticationProvider,
@@ -215,15 +234,56 @@ router.post("hooks.slack", async (ctx) => {
     return;
   }
 
+  // Try to find the user by matching the email address if it is confirmed on
+  // Slack's side. It's always trusted on our side as it is only updatable
+  // through the authentication provider.
+  if (!user) {
+    const auth = await IntegrationAuthentication.findOne({
+      where: {
+        service: "slack",
+        teamId: team.id,
+      },
+    });
+
+    if (auth) {
+      try {
+        const response = await Slack.request("users.info", {
+          token: auth.token,
+          user: user_id,
+        });
+
+        if (response.user.is_email_confirmed && response.user.profile.email) {
+          user = await User.findOne({
+            where: {
+              email: response.user.profile.email,
+              teamId: team.id,
+            },
+          });
+        }
+      } catch (err) {
+        // Old connections do not have the correct permissions to access user info
+        // so errors here are expected.
+        Logger.info(
+          "utils",
+          "Failed requesting users.info from Slack, the Slack integration should be reconnected.",
+          {
+            teamId: auth.teamId,
+          }
+        );
+      }
+    }
+  }
+
   const options = {
     limit: 5,
   };
+
   // If we were able to map the request to a user then we can use their permissions
   // to load more documents based on the collections they have access to. Otherwise
   // just a generic search against team-visible documents is allowed.
   const { results, totalCount } = user
-    ? await Document.searchForUser(user, text, options)
-    : await Document.searchForTeam(team, text, options);
+    ? await SearchHelper.searchForUser(user, text, options)
+    : await SearchHelper.searchForTeam(team, text, options);
   SearchQuery.create({
     userId: user ? user.id : null,
     teamId: team.id,
@@ -244,10 +304,10 @@ router.post("hooks.slack", async (ctx) => {
       attachments.push(
         presentSlackAttachment(
           result.document,
-          result.document.collection,
           team,
+          result.document.collection,
           queryIsInTitle ? undefined : result.context,
-          process.env.SLACK_MESSAGE_ACTIONS
+          env.SLACK_MESSAGE_ACTIONS
             ? [
                 {
                   name: "post",

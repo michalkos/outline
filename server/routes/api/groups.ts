@@ -1,4 +1,3 @@
-import invariant from "invariant";
 import Router from "koa-router";
 import { Op } from "sequelize";
 import { MAX_AVATAR_DISPLAY } from "@shared/constants";
@@ -17,8 +16,8 @@ import pagination from "./middlewares/pagination";
 const router = new Router();
 
 router.post("groups.list", auth(), pagination(), async (ctx) => {
-  let { direction } = ctx.body;
-  const { sort = "updatedAt" } = ctx.body;
+  let { direction } = ctx.request.body;
+  const { sort = "updatedAt" } = ctx.request.body;
   if (direction !== "ASC") {
     direction = "DESC";
   }
@@ -45,14 +44,16 @@ router.post("groups.list", auth(), pagination(), async (ctx) => {
             .slice(0, MAX_AVATAR_DISPLAY)
         )
         .flat()
-        .map(presentGroupMembership),
+        .map((membership) =>
+          presentGroupMembership(membership, { includeUser: true })
+        ),
     },
     policies: presentPolicies(user, groups),
   };
 });
 
 router.post("groups.info", auth(), async (ctx) => {
-  const { id } = ctx.body;
+  const { id } = ctx.request.body;
   assertUuid(id, "id is required");
 
   const { user } = ctx.state;
@@ -66,7 +67,7 @@ router.post("groups.info", auth(), async (ctx) => {
 });
 
 router.post("groups.create", auth(), async (ctx) => {
-  const { name } = ctx.body;
+  const { name } = ctx.request.body;
   assertPresent(name, "name is required");
 
   const { user } = ctx.state;
@@ -78,8 +79,7 @@ router.post("groups.create", auth(), async (ctx) => {
   });
 
   // reload to get default scope
-  const group = await Group.findByPk(g.id);
-  invariant(group, "group not found");
+  const group = await Group.findByPk(g.id, { rejectOnEmpty: true });
 
   await Event.create({
     name: "groups.create",
@@ -99,7 +99,7 @@ router.post("groups.create", auth(), async (ctx) => {
 });
 
 router.post("groups.update", auth(), async (ctx) => {
-  const { id, name } = ctx.body;
+  const { id, name } = ctx.request.body;
   assertPresent(name, "name is required");
   assertUuid(id, "id is required");
 
@@ -130,7 +130,7 @@ router.post("groups.update", auth(), async (ctx) => {
 });
 
 router.post("groups.delete", auth(), async (ctx) => {
-  const { id } = ctx.body;
+  const { id } = ctx.request.body;
   assertUuid(id, "id is required");
 
   const { user } = ctx.state;
@@ -155,7 +155,7 @@ router.post("groups.delete", auth(), async (ctx) => {
 });
 
 router.post("groups.memberships", auth(), pagination(), async (ctx) => {
-  const { id, query } = ctx.body;
+  const { id, query } = ctx.request.body;
   assertUuid(id, "id is required");
 
   const { user } = ctx.state;
@@ -191,14 +191,16 @@ router.post("groups.memberships", auth(), pagination(), async (ctx) => {
   ctx.body = {
     pagination: ctx.state.pagination,
     data: {
-      groupMemberships: memberships.map(presentGroupMembership),
+      groupMemberships: memberships.map((membership) =>
+        presentGroupMembership(membership, { includeUser: true })
+      ),
       users: memberships.map((membership) => presentUser(membership.user)),
     },
   };
 });
 
 router.post("groups.add_user", auth(), async (ctx) => {
-  const { id, userId } = ctx.body;
+  const { id, userId } = ctx.request.body;
   assertUuid(id, "id is required");
   assertUuid(userId, "userId is required");
 
@@ -227,12 +229,11 @@ router.post("groups.add_user", auth(), async (ctx) => {
         groupId: id,
         userId,
       },
+      rejectOnEmpty: true,
     });
-    invariant(membership, "membership not found");
 
     // reload to get default scope
-    group = await Group.findByPk(id);
-    invariant(group, "group not found");
+    group = await Group.findByPk(id, { rejectOnEmpty: true });
 
     await Event.create({
       name: "groups.add_user",
@@ -250,14 +251,16 @@ router.post("groups.add_user", auth(), async (ctx) => {
   ctx.body = {
     data: {
       users: [presentUser(user)],
-      groupMemberships: [presentGroupMembership(membership)],
+      groupMemberships: [
+        presentGroupMembership(membership, { includeUser: true }),
+      ],
       groups: [presentGroup(group)],
     },
   };
 });
 
 router.post("groups.remove_user", auth(), async (ctx) => {
-  const { id, userId } = ctx.body;
+  const { id, userId } = ctx.request.body;
   assertUuid(id, "id is required");
   assertUuid(userId, "userId is required");
 
@@ -281,8 +284,7 @@ router.post("groups.remove_user", auth(), async (ctx) => {
   });
 
   // reload to get default scope
-  group = await Group.findByPk(id);
-  invariant(group, "group not found");
+  group = await Group.findByPk(id, { rejectOnEmpty: true });
 
   ctx.body = {
     data: {

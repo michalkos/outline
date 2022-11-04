@@ -15,6 +15,14 @@ function KeyboardShortcuts() {
         title: t("Navigation"),
         items: [
           {
+            shortcut: (
+              <>
+                <Key symbol>{metaDisplay}</Key> + <Key>k</Key>
+              </>
+            ),
+            label: t("Open command menu"),
+          },
+          {
             shortcut: <Key>n</Key>,
             label: t("New document"),
           },
@@ -76,7 +84,7 @@ function KeyboardShortcuts() {
                 <Key symbol>{metaDisplay}</Key> + <Key>Enter</Key>
               </>
             ),
-            label: t("Save document and exit"),
+            label: t("Go to link"),
           },
           {
             shortcut: (
@@ -445,4 +453,4 @@ const Label = styled.dd`
   color: ${(props) => props.theme.textSecondary};
 `;
 
-export default KeyboardShortcuts;
+export default React.memo(KeyboardShortcuts);

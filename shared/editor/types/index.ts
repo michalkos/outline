@@ -3,6 +3,8 @@ import { EditorState, Transaction } from "prosemirror-state";
 import * as React from "react";
 import { DefaultTheme } from "styled-components";
 
+export type PlainTextSerializer = (node: ProsemirrorNode) => string;
+
 export enum EventType {
   blockMenuOpen = "blockMenuOpen",
   blockMenuClose = "blockMenuClose",
@@ -23,12 +25,6 @@ export type MenuItem = {
   attrs?: Record<string, any>;
   visible?: boolean;
   active?: (state: EditorState) => boolean;
-};
-
-export type EmbedDescriptor = MenuItem & {
-  icon: React.FC<any>;
-  matcher: (url: string) => boolean | [] | RegExpMatchArray;
-  component: typeof React.Component | React.FC<any>;
 };
 
 export type ComponentProps = {

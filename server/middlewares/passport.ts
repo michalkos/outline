@@ -1,7 +1,9 @@
 import passport from "@outlinewiki/koa-passport";
 import { Context } from "koa";
-import Logger from "@server/logging/logger";
+import env from "@server/env";
+import Logger from "@server/logging/Logger";
 import { signIn } from "@server/utils/authentication";
+import { parseState } from "@server/utils/passport";
 import { AccountProvisionerResult } from "../commands/accountProvisioner";
 
 export default function createMiddleware(providerName: string) {
@@ -17,10 +19,32 @@ export default function createMiddleware(providerName: string) {
 
           if (err.id) {
             const notice = err.id.replace(/_/g, "-");
-            return ctx.redirect(`${err.redirectUrl || "/"}?notice=${notice}`);
+            const redirectUrl = err.redirectUrl ?? "/";
+            const hasQueryString = redirectUrl?.includes("?");
+
+            // Every authentication action is routed through the apex domain.
+            // But when there is an error, we want to redirect the user on the
+            // same domain or subdomain that they originated from (found in state).
+
+            // get original host
+            const state = ctx.cookies.get("state");
+            const host = state ? parseState(state).host : ctx.hostname;
+
+            // form a URL object with the err.redirectUrl and replace the host
+            const reqProtocol = ctx.protocol;
+            const requestHost = ctx.get("host");
+            const url = new URL(
+              `${reqProtocol}://${requestHost}${redirectUrl}`
+            );
+
+            url.host = host;
+
+            return ctx.redirect(
+              `${url.toString()}${hasQueryString ? "&" : "?"}notice=${notice}`
+            );
           }
 
-          if (process.env.NODE_ENV === "development") {
+          if (env.ENVIRONMENT === "development") {
             throw err;
           }
 

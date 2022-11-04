@@ -40,7 +40,7 @@ function Members() {
   const [data, setData] = React.useState<User[]>([]);
   const [totalPages, setTotalPages] = React.useState(0);
   const [userIds, setUserIds] = React.useState<string[]>([]);
-  const can = usePolicy(team.id);
+  const can = usePolicy(team);
   const query = params.get("query") || "";
   const filter = params.get("filter") || "";
   const sort = params.get("sort") || "name";
@@ -71,7 +71,7 @@ function Members() {
     };
 
     fetchData();
-  }, [query, sort, filter, page, direction, users]);
+  }, [query, sort, filter, page, direction, users, users.counts.all]);
 
   React.useEffect(() => {
     let filtered = users.orderedData;

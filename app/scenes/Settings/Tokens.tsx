@@ -23,7 +23,7 @@ function Tokens() {
   const { t } = useTranslation();
   const { apiKeys } = useStores();
   const [newModalOpen, handleNewModalOpen, handleNewModalClose] = useBoolean();
-  const can = usePolicy(team.id);
+  const can = usePolicy(team);
 
   return (
     <Scene
@@ -61,7 +61,7 @@ function Tokens() {
         items={apiKeys.orderedData}
         heading={<Subheading sticky>{t("Tokens")}</Subheading>}
         renderItem={(token: ApiKey) => (
-          <TokenListItem key={token.id} token={token} onDelete={token.delete} />
+          <TokenListItem key={token.id} token={token} />
         )}
       />
       <Modal

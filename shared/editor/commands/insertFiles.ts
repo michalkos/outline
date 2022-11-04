@@ -13,6 +13,8 @@ export type Options = {
   isAttachment?: boolean;
   /** Set to true to replace any existing image at the users selection */
   replaceExisting?: boolean;
+  /** Width to use when inserting image */
+  width?: number;
   uploadFile?: (file: File) => Promise<string>;
   onFileUploadStart?: () => void;
   onFileUploadStop?: () => void;
@@ -83,7 +85,7 @@ const insertFiles = function (
           $pos.pos + ($pos.nodeAfter?.nodeSize || 0),
           schema.nodes.attachment.create({
             id,
-            title: file.name,
+            title: file.name ?? "Untitled",
             size: file.size,
           })
         )
@@ -112,7 +114,7 @@ const insertFiles = function (
                 .replaceWith(
                   from,
                   to || from,
-                  schema.nodes.image.create({ src })
+                  schema.nodes.image.create({ src, width: options.width })
                 )
                 .setMeta(uploadPlaceholderPlugin, { remove: { id } })
             );
@@ -149,7 +151,7 @@ const insertFiles = function (
               to || from,
               schema.nodes.attachment.create({
                 href: src,
-                title: file.name,
+                title: file.name ?? "Untitled",
                 size: file.size,
               })
             )

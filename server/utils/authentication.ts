@@ -2,19 +2,27 @@ import querystring from "querystring";
 import { addMonths } from "date-fns";
 import { Context } from "koa";
 import { pick } from "lodash";
-import Logger from "@server/logging/logger";
+import { getCookieDomain } from "@shared/utils/domains";
+import env from "@server/env";
+import Logger from "@server/logging/Logger";
 import { User, Event, Team, Collection, View } from "@server/models";
-import { getCookieDomain } from "@server/utils/domains";
 
-export function getAllowedDomains(): string[] {
-  // GOOGLE_ALLOWED_DOMAINS included here for backwards compatability
-  const env = process.env.ALLOWED_DOMAINS || process.env.GOOGLE_ALLOWED_DOMAINS;
-  return env ? env.split(",") : [];
-}
-
-export function isDomainAllowed(domain: string): boolean {
-  const allowedDomains = getAllowedDomains();
-  return allowedDomains.includes(domain) || allowedDomains.length === 0;
+/**
+ * Parse and return the details from the "sessions" cookie in the request, if
+ * any. The cookie is on the apex domain and includes session details for
+ * other subdomains.
+ *
+ * @param ctx The Koa context
+ * @returns The session details
+ */
+export function getSessionsInCookie(ctx: Context) {
+  try {
+    const sessionCookie = ctx.cookies.get("sessions") || "";
+    const decodedSessionCookie = decodeURIComponent(sessionCookie);
+    return decodedSessionCookie ? JSON.parse(decodedSessionCookie) : {};
+  } catch (err) {
+    return {};
+  }
 }
 
 export async function signIn(
@@ -50,7 +58,8 @@ export async function signIn(
   }
 
   // update the database when the user last signed in
-  user.updateSignedIn(ctx.request.ip);
+  await user.updateSignedIn(ctx.request.ip);
+
   // don't await event creation for a faster sign-in
   Event.create({
     name: "users.signin",
@@ -69,17 +78,16 @@ export async function signIn(
   // only used to display a UI hint for the user for next time
   ctx.cookies.set("lastSignedIn", service, {
     httpOnly: false,
+    sameSite: true,
     expires: new Date("2100"),
     domain,
   });
 
   // set a transfer cookie for the access token itself and redirect
   // to the teams subdomain if subdomains are enabled
-  if (process.env.SUBDOMAINS_ENABLED === "true" && team.subdomain) {
+  if (env.SUBDOMAINS_ENABLED && team.subdomain) {
     // get any existing sessions (teams signed in) and add this team
-    const existing = JSON.parse(
-      decodeURIComponent(ctx.cookies.get("sessions") || "") || "{}"
-    );
+    const existing = getSessionsInCookie(ctx);
     const sessions = encodeURIComponent(
       JSON.stringify({
         ...existing,
@@ -98,6 +106,7 @@ export async function signIn(
     ctx.redirect(`${team.url}/auth/redirect?token=${user.getTransferToken()}`);
   } else {
     ctx.cookies.set("accessToken", user.getJwtToken(), {
+      sameSite: true,
       httpOnly: false,
       expires,
     });

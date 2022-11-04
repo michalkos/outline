@@ -16,18 +16,23 @@ import { EditorState, Selection, Plugin, Transaction } from "prosemirror-state";
 import { Decoration, EditorView } from "prosemirror-view";
 import * as React from "react";
 import { DefaultTheme, ThemeProps } from "styled-components";
+import EditorContainer from "@shared/editor/components/Styles";
+import { EmbedDescriptor } from "@shared/editor/embeds";
 import Extension, { CommandFactory } from "@shared/editor/lib/Extension";
 import ExtensionManager from "@shared/editor/lib/ExtensionManager";
-import headingToSlug from "@shared/editor/lib/headingToSlug";
+import getHeadings from "@shared/editor/lib/getHeadings";
+import getTasks from "@shared/editor/lib/getTasks";
 import { MarkdownSerializer } from "@shared/editor/lib/markdown/serializer";
 import Mark from "@shared/editor/marks/Mark";
 import Node from "@shared/editor/nodes/Node";
 import ReactNode from "@shared/editor/nodes/ReactNode";
 import fullExtensionsPackage from "@shared/editor/packages/full";
-import { EmbedDescriptor, EventType } from "@shared/editor/types";
+import { EventType } from "@shared/editor/types";
+import { UserPreferences } from "@shared/types";
 import EventEmitter from "@shared/utils/events";
 import Flex from "~/components/Flex";
 import { Dictionary } from "~/hooks/useDictionary";
+import Logger from "~/utils/Logger";
 import BlockMenu from "./components/BlockMenu";
 import ComponentView from "./components/ComponentView";
 import EditorContext from "./components/EditorContext";
@@ -35,7 +40,6 @@ import EmojiMenu from "./components/EmojiMenu";
 import { SearchResult } from "./components/LinkEditor";
 import LinkToolbar from "./components/LinkToolbar";
 import SelectionToolbar from "./components/SelectionToolbar";
-import EditorContainer from "./components/Styles";
 import WithTheme from "./components/WithTheme";
 
 export { default as Extension } from "@shared/editor/lib/Extension";
@@ -96,17 +100,18 @@ export type Props = {
   ) => void;
   /** Callback when user hovers on any link in the document */
   onHoverLink?: (event: MouseEvent) => boolean;
-  /** Callback when user clicks on any hashtag in the document */
-  onClickHashtag?: (tag: string, event: MouseEvent) => void;
   /** Callback when user presses any key with document focused */
   onKeyDown?: (event: React.KeyboardEvent<HTMLDivElement>) => void;
   /** Collection of embed types to render in the document */
   embeds: EmbedDescriptor[];
+  /** Display preferences for the logged in user, if any. */
+  userPreferences?: UserPreferences | null;
   /** Whether embeds should be rendered without an iframe */
   embedsDisabled?: boolean;
   /** Callback when a toast message is triggered (eg "link copied") */
   onShowToast: (message: string) => void;
   className?: string;
+  /** Optional style overrides */
   style?: React.CSSProperties;
 };
 
@@ -428,7 +433,7 @@ export class Editor extends React.PureComponent<
       state: this.createState(this.props.value),
       editable: () => !this.props.readOnly,
       nodeViews: this.nodeViews,
-      dispatchTransaction: function (transaction) {
+      dispatchTransaction(transaction) {
         // callback is bound to have the view instance as its this binding
         const { state, transactions } = this.state.applyTransaction(
           transaction
@@ -470,13 +475,13 @@ export class Editor extends React.PureComponent<
     try {
       const element = document.querySelector(hash);
       if (element) {
-        element.scrollIntoView({ behavior: "smooth" });
+        setTimeout(() => element.scrollIntoView({ behavior: "smooth" }), 0);
       }
     } catch (err) {
       // querySelector will throw an error if the hash begins with a number
       // or contains a period. This is protected against now by safeSlugify
       // however previous links may be in the wild.
-      console.warn(`Attempted to scroll to invalid hash: ${hash}`, err);
+      Logger.debug("editor", `Attempted to scroll to invalid hash: ${hash}`);
     }
   }
 
@@ -552,7 +557,14 @@ export class Editor extends React.PureComponent<
     this.setState({ blockMenuOpen: true, blockMenuSearch: search });
   };
 
-  private handleCloseBlockMenu = () => {
+  private handleCloseBlockMenu = (insertNewLine?: boolean) => {
+    if (insertNewLine) {
+      const transaction = this.view.state.tr.split(
+        this.view.state.selection.to
+      );
+      this.view.dispatch(transaction);
+      this.view.focus();
+    }
     if (!this.state.blockMenuOpen) {
       return;
     }
@@ -574,34 +586,11 @@ export class Editor extends React.PureComponent<
   };
 
   public getHeadings = () => {
-    const headings: { title: string; level: number; id: string }[] = [];
-    const previouslySeen = {};
+    return getHeadings(this.view.state.doc);
+  };
 
-    this.view.state.doc.forEach((node) => {
-      if (node.type.name === "heading") {
-        // calculate the optimal slug
-        const slug = headingToSlug(node);
-        let id = slug;
-
-        // check if we've already used it, and if so how many times?
-        // Make the new id based on that number ensuring that we have
-        // unique ID's even when headings are identical
-        if (previouslySeen[slug] > 0) {
-          id = headingToSlug(node, previouslySeen[slug]);
-        }
-
-        // record that we've seen this slug for the next loop
-        previouslySeen[slug] =
-          previouslySeen[slug] !== undefined ? previouslySeen[slug] + 1 : 1;
-
-        headings.push({
-          title: node.textContent,
-          level: node.attrs.level,
-          id,
-        });
-      }
-    });
-    return headings;
+  public getTasks = () => {
+    return getTasks(this.view.state.doc);
   };
 
   public render() {

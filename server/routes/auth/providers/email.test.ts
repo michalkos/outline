@@ -1,17 +1,11 @@
-import TestServer from "fetch-test-server";
+import sharedEnv from "@shared/env";
 import SigninEmail from "@server/emails/templates/SigninEmail";
 import WelcomeEmail from "@server/emails/templates/WelcomeEmail";
-import webService from "@server/services/web";
+import env from "@server/env";
 import { buildUser, buildGuestUser, buildTeam } from "@server/test/factories";
-import { flushdb } from "@server/test/support";
+import { getTestServer } from "@server/test/support";
 
-const app = webService();
-const server = new TestServer(app.callback());
-
-beforeEach(async () => {
-  await flushdb();
-});
-afterAll(() => server.close());
+const server = getTestServer();
 
 describe("email", () => {
   it("should require email param", async () => {
@@ -39,9 +33,11 @@ describe("email", () => {
     spy.mockRestore();
   });
 
-  it("should respond with redirect location when user is SSO enabled on another subdomain", async () => {
-    process.env.URL = "http://localoutline.com";
-    process.env.SUBDOMAINS_ENABLED = "true";
+  it("should not send email when user is on another subdomain but respond with success", async () => {
+    env.URL = sharedEnv.URL = "http://localoutline.com";
+    env.SUBDOMAINS_ENABLED = sharedEnv.SUBDOMAINS_ENABLED = true;
+    env.DEPLOYMENT = "hosted";
+
     const user = await buildUser();
     const spy = jest.spyOn(WelcomeEmail, "schedule");
     await buildTeam({
@@ -55,19 +51,28 @@ describe("email", () => {
         host: "example.localoutline.com",
       },
     });
+
     const body = await res.json();
     expect(res.status).toEqual(200);
-    expect(body.redirect).toMatch("slack");
+    expect(body.success).toEqual(true);
     expect(spy).not.toHaveBeenCalled();
     spy.mockRestore();
   });
 
-  it("should respond with success when user is not SSO enabled", async () => {
+  it("should respond with success and email to be sent when user is not SSO enabled", async () => {
     const spy = jest.spyOn(SigninEmail, "schedule");
-    const user = await buildGuestUser();
+    const team = await buildTeam({
+      subdomain: "example",
+    });
+    const user = await buildGuestUser({
+      teamId: team.id,
+    });
     const res = await server.post("/auth/email", {
       body: {
         email: user.email,
+      },
+      headers: {
+        host: "example.localoutline.com",
       },
     });
     const body = await res.json();
@@ -79,9 +84,15 @@ describe("email", () => {
 
   it("should respond with success regardless of whether successful to prevent crawling email logins", async () => {
     const spy = jest.spyOn(WelcomeEmail, "schedule");
+    await buildTeam({
+      subdomain: "example",
+    });
     const res = await server.post("/auth/email", {
       body: {
         email: "user@example.com",
+      },
+      headers: {
+        host: "example.localoutline.com",
       },
     });
     const body = await res.json();
@@ -93,8 +104,8 @@ describe("email", () => {
   describe("with multiple users matching email", () => {
     it("should default to current subdomain with SSO", async () => {
       const spy = jest.spyOn(SigninEmail, "schedule");
-      process.env.URL = "http://localoutline.com";
-      process.env.SUBDOMAINS_ENABLED = "true";
+      env.URL = sharedEnv.URL = "http://localoutline.com";
+      env.SUBDOMAINS_ENABLED = sharedEnv.SUBDOMAINS_ENABLED = true;
       const email = "sso-user@example.org";
       const team = await buildTeam({
         subdomain: "example",
@@ -123,8 +134,8 @@ describe("email", () => {
 
     it("should default to current subdomain with guest email", async () => {
       const spy = jest.spyOn(SigninEmail, "schedule");
-      process.env.URL = "http://localoutline.com";
-      process.env.SUBDOMAINS_ENABLED = "true";
+      env.URL = sharedEnv.URL = "http://localoutline.com";
+      env.SUBDOMAINS_ENABLED = sharedEnv.SUBDOMAINS_ENABLED = true;
       const email = "guest-user@example.org";
       const team = await buildTeam({
         subdomain: "example",

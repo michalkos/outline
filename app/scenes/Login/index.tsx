@@ -5,50 +5,48 @@ import * as React from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useLocation, Link, Redirect } from "react-router-dom";
 import styled from "styled-components";
-import { setCookie } from "tiny-cookie";
+import { getCookie, setCookie } from "tiny-cookie";
+import { parseDomain } from "@shared/utils/domains";
 import { Config } from "~/stores/AuthStore";
 import ButtonLarge from "~/components/ButtonLarge";
 import Fade from "~/components/Fade";
 import Flex from "~/components/Flex";
 import Heading from "~/components/Heading";
+import LoadingIndicator from "~/components/LoadingIndicator";
 import NoticeAlert from "~/components/NoticeAlert";
 import OutlineLogo from "~/components/OutlineLogo";
 import PageTitle from "~/components/PageTitle";
 import TeamLogo from "~/components/TeamLogo";
 import Text from "~/components/Text";
 import env from "~/env";
+import useLastVisitedPath from "~/hooks/useLastVisitedPath";
 import useQuery from "~/hooks/useQuery";
 import useStores from "~/hooks/useStores";
-import { isCustomDomain } from "~/utils/domains";
-import isHosted from "~/utils/isHosted";
+import isCloudHosted from "~/utils/isCloudHosted";
 import { changeLanguage, detectLanguage } from "~/utils/language";
+import AuthenticationProvider from "./AuthenticationProvider";
 import Notices from "./Notices";
-import Provider from "./Provider";
 
 function Header({ config }: { config?: Config | undefined }) {
   const { t } = useTranslation();
   const isSubdomain = !!config?.hostname;
 
-  if (!isHosted || isCustomDomain()) {
+  if (!isCloudHosted || parseDomain(window.location.origin).custom) {
     return null;
   }
 
-  if (isSubdomain) {
-    return (
-      <Back href={env.URL}>
-        <BackIcon color="currentColor" /> {t("Back to home")}
-      </Back>
-    );
-  }
-
   return (
-    <Back href="https://www.getoutline.com">
-      <BackIcon color="currentColor" /> {t("Back to website")}
+    <Back href={isSubdomain ? env.URL : "https://www.getoutline.com"}>
+      <BackIcon color="currentColor" /> {t("Back to home")}
     </Back>
   );
 }
 
-function Login() {
+type Props = {
+  children?: (config?: Config) => React.ReactNode;
+};
+
+function Login({ children }: Props) {
   const location = useLocation();
   const query = useQuery();
   const { t, i18n } = useTranslation();
@@ -57,6 +55,9 @@ function Login() {
   const [error, setError] = React.useState(null);
   const [emailLinkSentTo, setEmailLinkSentTo] = React.useState("");
   const isCreate = location.pathname === "/create";
+  const rememberLastPath = !!auth.user?.preferences?.rememberLastPath;
+  const [lastVisitedPath] = useLastVisitedPath();
+
   const handleReset = React.useCallback(() => {
     setEmailLinkSentTo("");
   }, []);
@@ -77,14 +78,22 @@ function Login() {
 
   React.useEffect(() => {
     const entries = Object.fromEntries(query.entries());
+    const existing = getCookie("signupQueryParams");
 
-    // We don't want to override this cookie if we're viewing an error notice
-    // sent back from the server via query string (notice=), or if there are no
-    // query params at all.
-    if (Object.keys(entries).length && !query.get("notice")) {
+    // We don't want to set this cookie if we're viewing an error notice via
+    // query string(notice =), if there are no query params, or it's already set
+    if (Object.keys(entries).length && !query.get("notice") && !existing) {
       setCookie("signupQueryParams", JSON.stringify(entries));
     }
   }, [query]);
+
+  if (
+    auth.authenticated &&
+    rememberLastPath &&
+    lastVisitedPath !== location.pathname
+  ) {
+    return <Redirect to={lastVisitedPath} />;
+  }
 
   if (auth.authenticated && auth.team?.defaultCollectionId) {
     return <Redirect to={`/collection/${auth.team?.defaultCollectionId}`} />;
@@ -102,10 +111,11 @@ function Login() {
           <PageTitle title={t("Login")} />
           <NoticeAlert>
             {t("Failed to load configuration.")}
-            {!isHosted && (
+            {!isCloudHosted && (
               <p>
-                Check the network requests and server logs for full details of
-                the error.
+                {t(
+                  "Check the network requests and server logs for full details of the error."
+                )}
               </p>
             )}
           </NoticeAlert>
@@ -114,9 +124,10 @@ function Login() {
     );
   }
 
-  // we're counting on the config request being fast, so display nothing while waiting
+  // we're counting on the config request being fast, so just a simple loading
+  // indicator here that's delayed by 250ms
   if (!config) {
-    return null;
+    return <LoadingIndicator />;
   }
 
   const hasMultipleProviders = config.providers.length > 1;
@@ -152,35 +163,42 @@ function Login() {
   return (
     <Background>
       <Header config={config} />
-      <Centered align="center" justify="center" column auto>
-        <PageTitle title={t("Login")} />
+      <Centered align="center" justify="center" gap={12} column auto>
+        <PageTitle
+          title={config.name ? `${config.name} – ${t("Login")}` : t("Login")}
+        />
         <Logo>
-          {env.TEAM_LOGO && !isHosted ? (
-            <TeamLogo src={env.TEAM_LOGO} />
+          {config.logo ? (
+            <TeamLogo width={48} height={48} src={config.logo} />
           ) : (
-            <OutlineLogo size={38} fill="currentColor" />
+            <OutlineLogo size={42} fill="currentColor" />
           )}
         </Logo>
         {isCreate ? (
           <>
-            <Heading centered>{t("Create an account")}</Heading>
-            <GetStarted>
+            <StyledHeading as="h2" centered>
+              {t("Create a workspace")}
+            </StyledHeading>
+            <Content>
               {t(
-                "Get started by choosing a sign-in method for your new team below…"
+                "Get started by choosing a sign-in method for your new workspace below…"
               )}
-            </GetStarted>
+            </Content>
           </>
         ) : (
-          <Heading centered>
-            {t("Login to {{ authProviderName }}", {
-              authProviderName: config.name || "Outline",
-            })}
-          </Heading>
+          <>
+            <StyledHeading as="h2" centered>
+              {t("Login to {{ authProviderName }}", {
+                authProviderName: config.name || "Outline",
+              })}
+            </StyledHeading>
+            {children?.(config)}
+          </>
         )}
         <Notices />
         {defaultProvider && (
           <React.Fragment key={defaultProvider.id}>
-            <Provider
+            <AuthenticationProvider
               isCreate={isCreate}
               onEmailSuccess={handleEmailSuccess}
               {...defaultProvider}
@@ -192,18 +210,18 @@ function Login() {
                     authProviderName: defaultProvider.name,
                   })}
                 </Note>
-                <Or />
+                <Or data-text={t("Or")} />
               </>
             )}
           </React.Fragment>
         )}
-        {config.providers.map((provider: any) => {
+        {config.providers.map((provider) => {
           if (defaultProvider && provider.id === defaultProvider.id) {
             return null;
           }
 
           return (
-            <Provider
+            <AuthenticationProvider
               key={provider.id}
               isCreate={isCreate}
               onEmailSuccess={handleEmailSuccess}
@@ -223,30 +241,36 @@ function Login() {
   );
 }
 
+const StyledHeading = styled(Heading)`
+  margin: 0;
+`;
+
 const CheckEmailIcon = styled(EmailIcon)`
   margin-bottom: -1.5em;
 `;
 
 const Background = styled(Fade)`
   width: 100vw;
-  height: 100vh;
+  height: 100%;
   background: ${(props) => props.theme.background};
   display: flex;
 `;
 
 const Logo = styled.div`
-  margin-bottom: -1.5em;
-  height: 38px;
+  margin-bottom: -4px;
 `;
 
-const GetStarted = styled(Text)`
+const Content = styled(Text)`
+  color: ${(props) => props.theme.textSecondary};
   text-align: center;
-  margin-top: -12px;
+  margin-top: -8px;
 `;
 
 const Note = styled(Text)`
+  color: ${(props) => props.theme.textTertiary};
   text-align: center;
   font-size: 14px;
+  margin-top: 8px;
 
   em {
     font-style: normal;
@@ -279,7 +303,7 @@ const Or = styled.hr`
   width: 100%;
 
   &:after {
-    content: "Or";
+    content: attr(data-text);
     display: block;
     position: absolute;
     left: 50%;

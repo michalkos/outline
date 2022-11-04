@@ -1,3 +1,4 @@
+import { LocationDescriptor } from "history";
 import * as React from "react";
 import styled, { useTheme, css } from "styled-components";
 import breakpoint from "styled-components-breakpoint";
@@ -14,8 +15,7 @@ export type DragObject = NavigationNode & {
 };
 
 type Props = Omit<NavLinkProps, "to"> & {
-  to?: string | Record<string, any>;
-  href?: string | Record<string, any>;
+  to?: LocationDescriptor;
   innerRef?: (ref: HTMLElement | null | undefined) => void;
   onClick?: React.MouseEventHandler<HTMLAnchorElement>;
   onMouseEnter?: React.MouseEventHandler<HTMLAnchorElement>;
@@ -104,6 +104,7 @@ function SidebarLink(
               expanded={expanded}
               onClick={onDisclosureClick}
               root={depth === 0}
+              tabIndex={-1}
             />
           )}
           {icon && <IconWrapper>{icon}</IconWrapper>}
@@ -178,7 +179,7 @@ const Link = styled(NavLink)<{
   color: ${(props) =>
     props.$isActiveDrop ? props.theme.white : props.theme.sidebarText};
   font-size: 16px;
-  cursor: pointer;
+  cursor: var(--pointer);
   overflow: hidden;
 
   ${(props) =>

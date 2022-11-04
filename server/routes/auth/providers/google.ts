@@ -1,22 +1,24 @@
 import passport from "@outlinewiki/koa-passport";
+import type { Context } from "koa";
 import Router from "koa-router";
 import { capitalize } from "lodash";
-// @ts-expect-error ts-migrate(7016) FIXME: Could not find a declaration file for module 'pass... Remove this comment to see the full error message
+import { Profile } from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth2";
-import accountProvisioner from "@server/commands/accountProvisioner";
+import { slugifyDomain } from "@shared/utils/domains";
+import accountProvisioner, {
+  AccountProvisionerResult,
+} from "@server/commands/accountProvisioner";
 import env from "@server/env";
 import {
-  GoogleWorkspaceRequiredError,
-  GoogleWorkspaceInvalidError,
+  GmailAccountCreationError,
+  TeamDomainRequiredError,
 } from "@server/errors";
 import passportMiddleware from "@server/middlewares/passport";
-import { isDomainAllowed } from "@server/utils/authentication";
-import { StateStore } from "@server/utils/passport";
+import { User } from "@server/models";
+import { StateStore, getTeamFromContext } from "@server/utils/passport";
 
 const router = new Router();
-const providerName = "google";
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
+const GOOGLE = "google";
 const scopes = [
   "https://www.googleapis.com/auth/userinfo.profile",
   "https://www.googleapis.com/auth/userinfo.email",
@@ -24,38 +26,80 @@ const scopes = [
 
 export const config = {
   name: "Google",
-  enabled: !!GOOGLE_CLIENT_ID,
+  enabled: !!env.GOOGLE_CLIENT_ID,
 };
 
-if (GOOGLE_CLIENT_ID) {
+type GoogleProfile = Profile & {
+  email: string;
+  picture: string;
+  _json: {
+    hd?: string;
+  };
+};
+
+if (env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET) {
   passport.use(
     new GoogleStrategy(
       {
-        clientID: GOOGLE_CLIENT_ID,
-        clientSecret: GOOGLE_CLIENT_SECRET,
+        clientID: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
         callbackURL: `${env.URL}/auth/google.callback`,
         passReqToCallback: true,
+        // @ts-expect-error StateStore
         store: new StateStore(),
         scope: scopes,
       },
-      // @ts-expect-error ts-migrate(7006) FIXME: Parameter 'req' implicitly has an 'any' type.
-      async function (req, accessToken, refreshToken, profile, done) {
+      async function (
+        ctx: Context,
+        accessToken: string,
+        refreshToken: string,
+        params: { expires_in: number },
+        profile: GoogleProfile,
+        done: (
+          err: Error | null,
+          user: User | null,
+          result?: AccountProvisionerResult
+        ) => void
+      ) {
         try {
+          // "domain" is the Google Workspaces domain
           const domain = profile._json.hd;
+          const team = await getTeamFromContext(ctx);
 
-          if (!domain) {
-            throw GoogleWorkspaceRequiredError();
+          // No profile domain means personal gmail account
+          // No team implies the request came from the apex domain
+          // This combination is always an error
+          if (!domain && !team) {
+            const userExists = await User.count({
+              where: { email: profile.email.toLowerCase() },
+            });
+
+            // Users cannot create a team with personal gmail accounts
+            if (!userExists) {
+              throw GmailAccountCreationError();
+            }
+
+            // To log-in with a personal account, users must specify a team subdomain
+            throw TeamDomainRequiredError();
           }
 
-          if (!isDomainAllowed(domain)) {
-            throw GoogleWorkspaceInvalidError();
-          }
-
-          const subdomain = domain.split(".")[0];
+          // remove the TLD and form a subdomain from the remaining
+          // subdomains of the form "foo.bar.com" are allowed as primary Google Workspaces domains
+          // see https://support.google.com/nonprofits/thread/19685140/using-a-subdomain-as-a-primary-domain
+          const subdomain = domain ? slugifyDomain(domain) : "";
           const teamName = capitalize(subdomain);
+
+          // Request a larger size profile picture than the default by tweaking
+          // the query parameter.
+          const avatarUrl = profile.picture.replace("=s96-c", "=s128-c");
+
+          // if a team can be inferred, we assume the user is only interested in signing into
+          // that team in particular; otherwise, we will do a best effort at finding their account
+          // or provisioning a new one (within AccountProvisioner)
           const result = await accountProvisioner({
-            ip: req.ip,
+            ip: ctx.ip,
             team: {
+              teamId: team?.id,
               name: teamName,
               domain,
               subdomain,
@@ -63,19 +107,21 @@ if (GOOGLE_CLIENT_ID) {
             user: {
               email: profile.email,
               name: profile.displayName,
-              avatarUrl: profile.picture,
+              avatarUrl,
             },
             authenticationProvider: {
-              name: providerName,
-              providerId: domain,
+              name: GOOGLE,
+              providerId: domain ?? "",
             },
             authentication: {
               providerId: profile.id,
               accessToken,
               refreshToken,
+              expiresIn: params.expires_in,
               scopes,
             },
           });
+
           return done(null, result.user, result);
         } catch (err) {
           return done(err, null);
@@ -86,13 +132,13 @@ if (GOOGLE_CLIENT_ID) {
 
   router.get(
     "google",
-    passport.authenticate(providerName, {
+    passport.authenticate(GOOGLE, {
       accessType: "offline",
       prompt: "select_account consent",
     })
   );
 
-  router.get("google.callback", passportMiddleware(providerName));
+  router.get("google.callback", passportMiddleware(GOOGLE));
 }
 
 export default router;

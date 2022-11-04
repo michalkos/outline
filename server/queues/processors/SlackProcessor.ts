@@ -1,5 +1,7 @@
 import fetch from "fetch-with-proxy";
 import { Op } from "sequelize";
+import { IntegrationType } from "@shared/types";
+import env from "@server/env";
 import { Document, Integration, Collection, Team } from "@server/models";
 import { presentSlackAttachment } from "@server/presenters";
 import {
@@ -31,7 +33,7 @@ export default class SlackProcessor extends BaseProcessor {
   }
 
   async integrationCreated(event: IntegrationEvent) {
-    const integration = await Integration.findOne({
+    const integration = (await Integration.findOne({
       where: {
         id: event.modelId,
         service: "slack",
@@ -44,7 +46,7 @@ export default class SlackProcessor extends BaseProcessor {
           as: "collection",
         },
       ],
-    });
+    })) as Integration<IntegrationType.Post>;
     if (!integration) {
       return;
     }
@@ -65,7 +67,7 @@ export default class SlackProcessor extends BaseProcessor {
           {
             color: collection.color,
             title: collection.name,
-            title_link: `${process.env.URL}${collection.url}`,
+            title_link: `${env.URL}${collection.url}`,
             text: collection.description,
           },
         ],
@@ -92,7 +94,7 @@ export default class SlackProcessor extends BaseProcessor {
       return;
     }
 
-    const integration = await Integration.findOne({
+    const integration = (await Integration.findOne({
       where: {
         teamId: document.teamId,
         collectionId: document.collectionId,
@@ -104,7 +106,7 @@ export default class SlackProcessor extends BaseProcessor {
           ],
         },
       },
-    });
+    })) as Integration<IntegrationType.Post>;
     if (!integration) {
       return;
     }
@@ -122,7 +124,7 @@ export default class SlackProcessor extends BaseProcessor {
       body: JSON.stringify({
         text,
         attachments: [
-          presentSlackAttachment(document, document.collection, team),
+          presentSlackAttachment(document, team, document.collection),
         ],
       }),
     });

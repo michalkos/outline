@@ -1,4 +1,5 @@
 import * as React from "react";
+import { useTranslation } from "react-i18next";
 import styled from "styled-components";
 import breakpoint from "styled-components-breakpoint";
 import Text from "~/components/Text";
@@ -48,25 +49,30 @@ export default function Contents({ headings, isFullWidth }: Props) {
     Infinity
   );
   const headingAdjustment = minHeading - 1;
+  const { t } = useTranslation();
 
   return (
     <Wrapper isFullWidth={isFullWidth}>
       <Sticky>
-        <Heading>Contents</Heading>
+        <Heading>{t("Contents")}</Heading>
         {headings.length ? (
           <List>
-            {headings.map((heading) => (
-              <ListItem
-                key={heading.id}
-                level={heading.level - headingAdjustment}
-                active={activeSlug === heading.id}
-              >
-                <Link href={`#${heading.id}`}>{heading.title}</Link>
-              </ListItem>
-            ))}
+            {headings
+              .filter((heading) => heading.level < 4)
+              .map((heading) => (
+                <ListItem
+                  key={heading.id}
+                  level={heading.level - headingAdjustment}
+                  active={activeSlug === heading.id}
+                >
+                  <Link href={`#${heading.id}`}>{heading.title}</Link>
+                </ListItem>
+              ))}
           </List>
         ) : (
-          <Empty>Headings you add to the document will appear here</Empty>
+          <Empty>
+            {t("Headings you add to the document will appear here")}
+          </Empty>
         )}
       </Sticky>
     </Wrapper>

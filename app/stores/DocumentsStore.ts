@@ -2,10 +2,11 @@ import path from "path";
 import invariant from "invariant";
 import { find, orderBy, filter, compact, omitBy } from "lodash";
 import { observable, action, computed, runInAction } from "mobx";
-import { MAX_TITLE_LENGTH } from "@shared/constants";
 import { DateFilter } from "@shared/types";
 import { subtractDate } from "@shared/utils/date";
+import { bytesToHumanReadable } from "@shared/utils/files";
 import naturalSort from "@shared/utils/naturalSort";
+import { DocumentValidation } from "@shared/validations";
 import BaseStore from "~/stores/BaseStore";
 import RootStore from "~/stores/RootStore";
 import Document from "~/models/Document";
@@ -147,7 +148,7 @@ export default class DocumentsStore extends BaseStore<Document> {
 
     return compact([
       ...drafts,
-      ...collection.documents.map((node) => this.get(node.id)),
+      ...collection.sortedDocuments.map((node) => this.get(node.id)),
     ]);
   }
 
@@ -303,27 +304,31 @@ export default class DocumentsStore extends BaseStore<Document> {
   };
 
   @action
-  fetchArchived = async (options?: PaginationParams): Promise<any> => {
+  fetchArchived = async (options?: PaginationParams): Promise<Document[]> => {
     return this.fetchNamedPage("archived", options);
   };
 
   @action
-  fetchDeleted = async (options?: PaginationParams): Promise<any> => {
+  fetchDeleted = async (options?: PaginationParams): Promise<Document[]> => {
     return this.fetchNamedPage("deleted", options);
   };
 
   @action
-  fetchRecentlyUpdated = async (options?: PaginationParams): Promise<any> => {
+  fetchRecentlyUpdated = async (
+    options?: PaginationParams
+  ): Promise<Document[]> => {
     return this.fetchNamedPage("list", options);
   };
 
   @action
-  fetchTemplates = async (options?: PaginationParams): Promise<any> => {
+  fetchTemplates = async (options?: PaginationParams): Promise<Document[]> => {
     return this.fetchNamedPage("list", { ...options, template: true });
   };
 
   @action
-  fetchAlphabetical = async (options?: PaginationParams): Promise<any> => {
+  fetchAlphabetical = async (
+    options?: PaginationParams
+  ): Promise<Document[]> => {
     return this.fetchNamedPage("list", {
       sort: "title",
       direction: "ASC",
@@ -334,7 +339,7 @@ export default class DocumentsStore extends BaseStore<Document> {
   @action
   fetchLeastRecentlyUpdated = async (
     options?: PaginationParams
-  ): Promise<any> => {
+  ): Promise<Document[]> => {
     return this.fetchNamedPage("list", {
       sort: "updatedAt",
       direction: "ASC",
@@ -343,7 +348,9 @@ export default class DocumentsStore extends BaseStore<Document> {
   };
 
   @action
-  fetchRecentlyPublished = async (options?: PaginationParams): Promise<any> => {
+  fetchRecentlyPublished = async (
+    options?: PaginationParams
+  ): Promise<Document[]> => {
     return this.fetchNamedPage("list", {
       sort: "publishedAt",
       direction: "DESC",
@@ -352,28 +359,30 @@ export default class DocumentsStore extends BaseStore<Document> {
   };
 
   @action
-  fetchRecentlyViewed = async (options?: PaginationParams): Promise<any> => {
+  fetchRecentlyViewed = async (
+    options?: PaginationParams
+  ): Promise<Document[]> => {
     return this.fetchNamedPage("viewed", options);
   };
 
   @action
-  fetchStarred = (options?: PaginationParams): Promise<any> => {
+  fetchStarred = (options?: PaginationParams): Promise<Document[]> => {
     return this.fetchNamedPage("starred", options);
   };
 
   @action
-  fetchDrafts = (options?: PaginationParams): Promise<any> => {
+  fetchDrafts = (options?: PaginationParams): Promise<Document[]> => {
     return this.fetchNamedPage("drafts", options);
   };
 
   @action
-  fetchOwned = (options?: PaginationParams): Promise<any> => {
+  fetchOwned = (options?: PaginationParams): Promise<Document[]> => {
     return this.fetchNamedPage("list", options);
   };
 
   @action
   searchTitles = async (query: string) => {
-    const res = await client.get("/documents.search_titles", {
+    const res = await client.post("/documents.search_titles", {
       query,
     });
     invariant(res?.data, "Search response should be available");
@@ -389,7 +398,7 @@ export default class DocumentsStore extends BaseStore<Document> {
     options: SearchParams
   ): Promise<SearchResult[]> => {
     const compactedOptions = omitBy(options, (o) => !o);
-    const res = await client.get("/documents.search", {
+    const res = await client.post("/documents.search", {
       ...compactedOptions,
       query,
     });
@@ -524,7 +533,7 @@ export default class DocumentsStore extends BaseStore<Document> {
         id: documentId,
         collectionId,
         parentDocumentId,
-        index: index,
+        index,
       });
       invariant(res?.data, "Data not available");
       res.data.documents.forEach(this.add);
@@ -545,7 +554,7 @@ export default class DocumentsStore extends BaseStore<Document> {
       template: document.template,
       title: `${document.title.slice(
         0,
-        MAX_TITLE_LENGTH - append.length
+        DocumentValidation.maxTitleLength - append.length
       )}${append}`,
       text: document.text,
     });
@@ -575,7 +584,11 @@ export default class DocumentsStore extends BaseStore<Document> {
     }
 
     if (file.size > env.MAXIMUM_IMPORT_SIZE) {
-      throw new Error("The selected file was too large to import");
+      throw new Error(
+        `The selected file was larger than the ${bytesToHumanReadable(
+          env.MAXIMUM_IMPORT_SIZE
+        )} maximum size`
+      );
     }
 
     const title = file.name.replace(/\.[^/.]+$/, "");
@@ -732,20 +745,37 @@ export default class DocumentsStore extends BaseStore<Document> {
     }
   };
 
-  star = async (document: Document) => {
-    await this.rootStore.stars.create({
+  star = (document: Document) => {
+    return this.rootStore.stars.create({
       documentId: document.id,
     });
   };
 
-  unstar = async (document: Document) => {
+  unstar = (document: Document) => {
     const star = this.rootStore.stars.orderedData.find(
       (star) => star.documentId === document.id
     );
-    await star?.delete();
+    return star?.delete();
   };
 
-  getByUrl = (url = ""): Document | null | undefined => {
+  subscribe = (document: Document) => {
+    return this.rootStore.subscriptions.create({
+      documentId: document.id,
+      event: "documents.update",
+    });
+  };
+
+  unsubscribe = (userId: string, document: Document) => {
+    const subscription = this.rootStore.subscriptions.orderedData.find(
+      (subscription) =>
+        subscription.documentId === document.id &&
+        subscription.userId === userId
+    );
+
+    return subscription?.delete();
+  };
+
+  getByUrl = (url = ""): Document | undefined => {
     return find(this.orderedData, (doc) => url.endsWith(doc.urlId));
   };
 

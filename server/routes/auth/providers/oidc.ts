@@ -1,34 +1,36 @@
 import passport from "@outlinewiki/koa-passport";
+import type { Context } from "koa";
 import Router from "koa-router";
 import { get } from "lodash";
 import { Strategy } from "passport-oauth2";
-import accountProvisioner from "@server/commands/accountProvisioner";
+import { slugifyDomain } from "@shared/utils/domains";
+import accountProvisioner, {
+  AccountProvisionerResult,
+} from "@server/commands/accountProvisioner";
 import env from "@server/env";
 import {
   OIDCMalformedUserInfoError,
   AuthenticationError,
 } from "@server/errors";
 import passportMiddleware from "@server/middlewares/passport";
-import { isDomainAllowed } from "@server/utils/authentication";
-import { StateStore, request } from "@server/utils/passport";
+import { User } from "@server/models";
+import {
+  StateStore,
+  request,
+  getTeamFromContext,
+} from "@server/utils/passport";
 
 const router = new Router();
 const providerName = "oidc";
-const OIDC_DISPLAY_NAME = process.env.OIDC_DISPLAY_NAME || "OpenID Connect";
-const OIDC_CLIENT_ID = process.env.OIDC_CLIENT_ID || "";
-const OIDC_CLIENT_SECRET = process.env.OIDC_CLIENT_SECRET || "";
-const OIDC_AUTH_URI = process.env.OIDC_AUTH_URI || "";
-const OIDC_TOKEN_URI = process.env.OIDC_TOKEN_URI || "";
-const OIDC_USERINFO_URI = process.env.OIDC_USERINFO_URI || "";
-const OIDC_SCOPES = process.env.OIDC_SCOPES || "";
-const OIDC_USERNAME_CLAIM =
-  process.env.OIDC_USERNAME_CLAIM || "preferred_username";
+const OIDC_AUTH_URI = env.OIDC_AUTH_URI || "";
+const OIDC_TOKEN_URI = env.OIDC_TOKEN_URI || "";
+const OIDC_USERINFO_URI = env.OIDC_USERINFO_URI || "";
 
 export const config = {
-  name: OIDC_DISPLAY_NAME,
-  enabled: !!OIDC_CLIENT_ID,
+  name: env.OIDC_DISPLAY_NAME,
+  enabled: !!env.OIDC_CLIENT_ID,
 };
-const scopes = OIDC_SCOPES.split(" ");
+const scopes = env.OIDC_SCOPES.split(" ");
 
 Strategy.prototype.userProfile = async function (accessToken, done) {
   try {
@@ -39,18 +41,18 @@ Strategy.prototype.userProfile = async function (accessToken, done) {
   }
 };
 
-if (OIDC_CLIENT_ID) {
+if (env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET) {
   passport.use(
     providerName,
     new Strategy(
       {
         authorizationURL: OIDC_AUTH_URI,
         tokenURL: OIDC_TOKEN_URI,
-        clientID: OIDC_CLIENT_ID,
-        clientSecret: OIDC_CLIENT_SECRET,
+        clientID: env.OIDC_CLIENT_ID,
+        clientSecret: env.OIDC_CLIENT_SECRET,
         callbackURL: `${env.URL}/auth/${providerName}.callback`,
         passReqToCallback: true,
-        scope: OIDC_SCOPES,
+        scope: env.OIDC_SCOPES,
         // @ts-expect-error custom state store
         store: new StateStore(),
         state: true,
@@ -63,11 +65,16 @@ if (OIDC_CLIENT_ID) {
       // Any claim supplied in response to the userinfo request will be
       // available on the `profile` parameter
       async function (
-        req: any,
+        ctx: Context,
         accessToken: string,
         refreshToken: string,
+        params: { expires_in: number },
         profile: Record<string, string>,
-        done: any
+        done: (
+          err: Error | null,
+          user: User | null,
+          result?: AccountProvisionerResult
+        ) => void
       ) {
         try {
           if (!profile.email) {
@@ -75,6 +82,7 @@ if (OIDC_CLIENT_ID) {
               `An email field was not returned in the profile parameter, but is required.`
             );
           }
+          const team = await getTeamFromContext(ctx);
 
           const parts = profile.email.toLowerCase().split("@");
           const domain = parts.length && parts[1];
@@ -83,16 +91,13 @@ if (OIDC_CLIENT_ID) {
             throw OIDCMalformedUserInfoError();
           }
 
-          if (!isDomainAllowed(domain)) {
-            throw AuthenticationError(
-              `Domain ${domain} is not on the whitelist`
-            );
-          }
+          // remove the TLD and form a subdomain from the remaining
+          const subdomain = slugifyDomain(domain);
 
-          const subdomain = domain.split(".")[0];
           const result = await accountProvisioner({
-            ip: req.ip,
+            ip: ctx.ip,
             team: {
+              teamId: team?.id,
               // https://github.com/outline/outline/pull/2388#discussion_r681120223
               name: "Wiki",
               domain,
@@ -104,7 +109,7 @@ if (OIDC_CLIENT_ID) {
               avatarUrl: profile.picture,
               // Claim name can be overriden using an env variable.
               // Default is 'preferred_username' as per OIDC spec.
-              username: get(profile, OIDC_USERNAME_CLAIM),
+              username: get(profile, env.OIDC_USERNAME_CLAIM),
             },
             authenticationProvider: {
               name: providerName,
@@ -114,6 +119,7 @@ if (OIDC_CLIENT_ID) {
               providerId: profile.sub,
               accessToken,
               refreshToken,
+              expiresIn: params.expires_in,
               scopes,
             },
           });

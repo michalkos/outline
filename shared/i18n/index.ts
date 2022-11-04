@@ -18,23 +18,19 @@ export const languageOptions = [
     value: "zh_TW",
   },
   {
-    label: "Deutsch (Deutschland)",
+    label: "Deutsch (German)",
     value: "de_DE",
   },
   {
-    label: "Español (España)",
+    label: "Español (Spanish)",
     value: "es_ES",
   },
   {
-    label: "فارسی (Persian)",
-    value: "fa_IR",
-  },
-  {
-    label: "Français (France)",
+    label: "Français (French)",
     value: "fr_FR",
   },
   {
-    label: "Italiano (Italia)",
+    label: "Italiano (Italian)",
     value: "it_IT",
   },
   {
@@ -46,20 +42,32 @@ export const languageOptions = [
     value: "ko_KR",
   },
   {
-    label: "Português (Brazil)",
+    label: "Nederland (Dutch, Netherlands)",
+    value: "nl_NL",
+  },
+  {
+    label: "Português (Portuguese, Brazil)",
     value: "pt_BR",
   },
   {
-    label: "Português (Portugal)",
+    label: "Português (Portuguese, Portugal)",
     value: "pt_PT",
   },
   {
-    label: "Pусский (Россия)",
+    label: "Polskie (Polish)",
+    value: "pl_PL",
+  },
+  {
+    label: "فارسی (Persian)",
+    value: "fa_IR",
+  },
+  {
+    label: "Pусский (Russian)",
     value: "ru_RU",
   },
   {
-    label: "Polskie (Polska)",
-    value: "pl_PL",
+    label: "Türkçe (Turkish)",
+    value: "tr_TR",
   },
   {
     label: "Tiếng Việt (Vietnamese)",
@@ -75,11 +83,8 @@ const underscoreToDash = (text: string) => text.replace("_", "-");
 
 const dashToUnderscore = (text: string) => text.replace("-", "_");
 
-export const initI18n = () => {
-  const lng = underscoreToDash(
-    // @ts-expect-error ts-migrate(2345) FIXME: Argument of type 'string | undefined' is not assig... Remove this comment to see the full error message
-    "DEFAULT_LANGUAGE" in process.env ? process.env.DEFAULT_LANGUAGE : "en_US"
-  );
+export const initI18n = (defaultLanguage = "en_US") => {
+  const lng = underscoreToDash(defaultLanguage);
   i18n
     .use(backend)
     .use(initReactI18next)
@@ -101,7 +106,6 @@ export const initI18n = () => {
       fallbackLng: lng,
       supportedLngs: languages.map(underscoreToDash),
       // Uncomment when debugging translation framework, otherwise it's noisy
-      // debug: process.env.NODE_ENV === "development",
       keySeparator: false,
     });
   return i18n;

@@ -1,4 +1,4 @@
-import { FindOptions } from "sequelize";
+import { FindOptions, Op } from "sequelize";
 import {
   DataType,
   BelongsTo,
@@ -6,12 +6,16 @@ import {
   DefaultScope,
   ForeignKey,
   Table,
+  IsNumeric,
+  Length as SimpleLength,
 } from "sequelize-typescript";
 import MarkdownSerializer from "slate-md-serializer";
+import { DocumentValidation } from "@shared/validations";
 import Document from "./Document";
 import User from "./User";
-import BaseModel from "./base/BaseModel";
+import IdModel from "./base/IdModel";
 import Fix from "./decorators/Fix";
+import Length from "./validators/Length";
 
 const serializer = new MarkdownSerializer();
 
@@ -26,13 +30,22 @@ const serializer = new MarkdownSerializer();
 }))
 @Table({ tableName: "revisions", modelName: "revision" })
 @Fix
-class Revision extends BaseModel {
+class Revision extends IdModel {
+  @IsNumeric
   @Column(DataType.SMALLINT)
   version: number;
 
+  @SimpleLength({
+    max: 255,
+    msg: `editorVersion must be 255 characters or less`,
+  })
   @Column
   editorVersion: string;
 
+  @Length({
+    max: DocumentValidation.maxTitleLength,
+    msg: `Revision title must be ${DocumentValidation.maxTitleLength} characters or less`,
+  })
   @Column
   title: string;
 
@@ -82,6 +95,20 @@ class Revision extends BaseModel {
       },
       options
     );
+  }
+
+  // instance methods
+
+  previous(): Promise<Revision | null> {
+    return (this.constructor as typeof Revision).findOne({
+      where: {
+        documentId: this.documentId,
+        createdAt: {
+          [Op.lt]: this.createdAt,
+        },
+      },
+      order: [["createdAt", "DESC"]],
+    });
   }
 
   migrateVersion = function () {

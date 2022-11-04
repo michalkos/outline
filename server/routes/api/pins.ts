@@ -1,4 +1,3 @@
-import invariant from "invariant";
 import Router from "koa-router";
 import { Sequelize, Op } from "sequelize";
 import pinCreator from "@server/commands/pinCreator";
@@ -18,8 +17,8 @@ import pagination from "./middlewares/pagination";
 const router = new Router();
 
 router.post("pins.create", auth(), async (ctx) => {
-  const { documentId, collectionId } = ctx.body;
-  const { index } = ctx.body;
+  const { documentId, collectionId } = ctx.request.body;
+  const { index } = ctx.request.body;
   assertUuid(documentId, "documentId is required");
 
   const { user } = ctx.state;
@@ -57,7 +56,7 @@ router.post("pins.create", auth(), async (ctx) => {
 });
 
 router.post("pins.list", auth(), pagination(), async (ctx) => {
-  const { collectionId } = ctx.body;
+  const { collectionId } = ctx.request.body;
   const { user } = ctx.state;
 
   const [pins, collectionIds] = await Promise.all([
@@ -100,14 +99,13 @@ router.post("pins.list", auth(), pagination(), async (ctx) => {
 });
 
 router.post("pins.update", auth(), async (ctx) => {
-  const { id, index } = ctx.body;
+  const { id, index } = ctx.request.body;
   assertUuid(id, "id is required");
 
   assertIndexCharacters(index);
 
   const { user } = ctx.state;
-  let pin = await Pin.findByPk(id);
-  invariant(pin, "pin not found");
+  let pin = await Pin.findByPk(id, { rejectOnEmpty: true });
 
   const document = await Document.findByPk(pin.documentId, {
     userId: user.id,
@@ -133,12 +131,11 @@ router.post("pins.update", auth(), async (ctx) => {
 });
 
 router.post("pins.delete", auth(), async (ctx) => {
-  const { id } = ctx.body;
+  const { id } = ctx.request.body;
   assertUuid(id, "id is required");
 
   const { user } = ctx.state;
-  const pin = await Pin.findByPk(id);
-  invariant(pin, "pin not found");
+  const pin = await Pin.findByPk(id, { rejectOnEmpty: true });
 
   const document = await Document.findByPk(pin.documentId, {
     userId: user.id,

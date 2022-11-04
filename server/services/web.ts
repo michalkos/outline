@@ -8,13 +8,14 @@ import {
 import mount from "koa-mount";
 import enforceHttps from "koa-sslify";
 import env from "@server/env";
-import Logger from "@server/logging/logger";
+import Logger from "@server/logging/Logger";
 import routes from "../routes";
 import api from "../routes/api";
 import auth from "../routes/auth";
 
-const isProduction = env.NODE_ENV === "production";
-const isTest = env.NODE_ENV === "test";
+const isProduction = env.ENVIRONMENT === "production";
+const isTest = env.ENVIRONMENT === "test";
+
 // Construct scripts CSP based on services in use by this installation
 const defaultSrc = ["'self'"];
 const scriptSrc = [
@@ -36,10 +37,9 @@ if (env.CDN_URL) {
 export default function init(app: Koa = new Koa()): Koa {
   if (isProduction) {
     // Force redirect to HTTPS protocol unless explicitly disabled
-    if (process.env.FORCE_HTTPS !== "false") {
+    if (env.FORCE_HTTPS) {
       app.use(
         enforceHttps({
-          // @ts-expect-error ts-migrate(2345) FIXME: Argument of type '{ trustProtoHeader: boolean; }' ... Remove this comment to see the full error message
           trustProtoHeader: true,
         })
       );
@@ -67,6 +67,10 @@ export default function init(app: Koa = new Koa()): Koa {
         poll: 1000,
         ignored: ["node_modules", "flow-typed", "server", "build", "__mocks__"],
       },
+      // Uncomment to test service worker
+      // headers: {
+      //   "Service-Worker-Allowed": "/",
+      // },
       // public path to bind the middleware to
       // use the same as in webpack
       publicPath: config.output.publicPath,

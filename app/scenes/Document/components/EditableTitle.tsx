@@ -2,13 +2,13 @@ import { observer } from "mobx-react";
 import * as React from "react";
 import styled from "styled-components";
 import breakpoint from "styled-components-breakpoint";
-import { MAX_TITLE_LENGTH } from "@shared/constants";
 import { light } from "@shared/styles/theme";
 import {
   getCurrentDateAsString,
   getCurrentDateTimeAsString,
   getCurrentTimeAsString,
 } from "@shared/utils/date";
+import { DocumentValidation } from "@shared/validations";
 import Document from "~/models/Document";
 import ContentEditable, { RefHandle } from "~/components/ContentEditable";
 import Star, { AnimatedStar } from "~/components/Star";
@@ -16,9 +16,9 @@ import useEmojiWidth from "~/hooks/useEmojiWidth";
 import { isModKey } from "~/utils/keyboard";
 
 type Props = {
-  value: string;
-  placeholder: string;
   document: Document;
+  /** Placeholder to display when the document has no title */
+  placeholder: string;
   /** Should the title be editable, policies will also be considered separately */
   readOnly?: boolean;
   /** Whether the title show the option to star, policies will also be considered separately (defaults to true) */
@@ -39,7 +39,6 @@ const fontSize = "2.25em";
 const EditableTitle = React.forwardRef(
   (
     {
-      value,
       document,
       readOnly,
       onChange,
@@ -51,9 +50,6 @@ const EditableTitle = React.forwardRef(
     }: Props,
     ref: React.RefObject<RefHandle>
   ) => {
-    const normalizedTitle =
-      !value && readOnly ? document.titleWithDefault : value;
-
     const handleClick = React.useCallback(() => {
       ref.current?.focus();
     }, [ref]);
@@ -121,6 +117,9 @@ const EditableTitle = React.forwardRef(
       lineHeight,
     });
 
+    const value =
+      !document.title && readOnly ? document.titleWithDefault : document.title;
+
     return (
       <Title
         onClick={handleClick}
@@ -128,11 +127,11 @@ const EditableTitle = React.forwardRef(
         onKeyDown={handleKeyDown}
         onBlur={onBlur}
         placeholder={placeholder}
-        value={normalizedTitle}
+        value={value}
         $emojiWidth={emojiWidth}
         $isStarred={document.isStarred}
-        autoFocus={!value}
-        maxLength={MAX_TITLE_LENGTH}
+        autoFocus={!document.title}
+        maxLength={DocumentValidation.maxTitleLength}
         readOnly={readOnly}
         dir="auto"
         ref={ref}

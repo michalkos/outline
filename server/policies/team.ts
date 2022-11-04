@@ -1,3 +1,4 @@
+import env from "@server/env";
 import { Team, User } from "@server/models";
 import { allow } from "./cancan";
 
@@ -10,7 +11,13 @@ allow(User, "share", Team, (user, team) => {
   return team.sharing;
 });
 
-allow(User, ["update", "export", "manage"], Team, (user, team) => {
+allow(User, "createTeam", Team, () => {
+  if (env.DEPLOYMENT !== "hosted") {
+    throw new Error("createTeam only available on cloud");
+  }
+});
+
+allow(User, ["update", "manage"], Team, (user, team) => {
   if (!team || user.isViewer || user.teamId !== team.id) {
     return false;
   }

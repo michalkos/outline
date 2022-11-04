@@ -1,3 +1,5 @@
+import { UserPreferences } from "@shared/types";
+import env from "@server/env";
 import { User } from "@server/models";
 
 type Options = {
@@ -17,12 +19,10 @@ type UserPresentation = {
   isViewer: boolean;
   email?: string | null;
   language?: string;
+  preferences?: UserPreferences | null;
 };
 
-export default (
-  user: User,
-  options: Options = {}
-): UserPresentation | null | undefined => {
+export default (user: User, options: Options = {}): UserPresentation => {
   const userData: UserPresentation = {
     id: user.id,
     name: user.name,
@@ -38,8 +38,8 @@ export default (
 
   if (options.includeDetails) {
     userData.email = user.email;
-    userData.language =
-      user.language || process.env.DEFAULT_LANGUAGE || "en_US";
+    userData.language = user.language || env.DEFAULT_LANGUAGE;
+    userData.preferences = user.preferences;
   }
 
   return userData;

@@ -9,7 +9,10 @@ import {
   LinkIcon,
   TeamIcon,
   BeakerIcon,
+  BuildingBlocksIcon,
   DownloadIcon,
+  WebhooksIcon,
+  SettingsIcon,
 } from "outline-icons";
 import React from "react";
 import { useTranslation } from "react-i18next";
@@ -20,16 +23,20 @@ import Groups from "~/scenes/Settings/Groups";
 import Import from "~/scenes/Settings/Import";
 import Members from "~/scenes/Settings/Members";
 import Notifications from "~/scenes/Settings/Notifications";
+import Preferences from "~/scenes/Settings/Preferences";
 import Profile from "~/scenes/Settings/Profile";
 import Security from "~/scenes/Settings/Security";
+import SelfHosted from "~/scenes/Settings/SelfHosted";
 import Shares from "~/scenes/Settings/Shares";
 import Slack from "~/scenes/Settings/Slack";
 import Tokens from "~/scenes/Settings/Tokens";
+import Webhooks from "~/scenes/Settings/Webhooks";
 import Zapier from "~/scenes/Settings/Zapier";
 import SlackIcon from "~/components/SlackIcon";
 import ZapierIcon from "~/components/ZapierIcon";
 import env from "~/env";
-import isHosted from "~/utils/isHosted";
+import isCloudHosted from "~/utils/isCloudHosted";
+import { accountPreferencesPath } from "~/utils/routeHelpers";
 import useCurrentTeam from "./useCurrentTeam";
 import usePolicy from "./usePolicy";
 
@@ -46,6 +53,7 @@ type SettingsPage =
   | "Shares"
   | "Import"
   | "Export"
+  | "Webhooks"
   | "Slack"
   | "Zapier";
 
@@ -64,7 +72,7 @@ type ConfigType = {
 
 const useAuthorizedSettingsConfig = () => {
   const team = useCurrentTeam();
-  const can = usePolicy(team.id);
+  const can = usePolicy(team);
   const { t } = useTranslation();
 
   const config: ConfigType = React.useMemo(
@@ -76,6 +84,14 @@ const useAuthorizedSettingsConfig = () => {
         enabled: true,
         group: t("Account"),
         icon: ProfileIcon,
+      },
+      Preferences: {
+        name: t("Preferences"),
+        path: accountPreferencesPath(),
+        component: Preferences,
+        enabled: true,
+        group: t("Account"),
+        icon: SettingsIcon,
       },
       Notifications: {
         name: t("Notifications"),
@@ -135,7 +151,7 @@ const useAuthorizedSettingsConfig = () => {
         icon: GroupIcon,
       },
       Shares: {
-        name: t("Share Links"),
+        name: t("Shared Links"),
         path: "/settings/shares",
         component: Shares,
         enabled: true,
@@ -146,7 +162,7 @@ const useAuthorizedSettingsConfig = () => {
         name: t("Import"),
         path: "/settings/import",
         component: Import,
-        enabled: can.manage,
+        enabled: can.createImport,
         group: t("Team"),
         icon: NewDocumentIcon,
       },
@@ -154,16 +170,32 @@ const useAuthorizedSettingsConfig = () => {
         name: t("Export"),
         path: "/settings/export",
         component: Export,
-        enabled: can.export,
+        enabled: can.createExport,
         group: t("Team"),
         icon: DownloadIcon,
       },
-      // Intergrations
+      // Integrations
+      Webhooks: {
+        name: t("Webhooks"),
+        path: "/settings/webhooks",
+        component: Webhooks,
+        enabled: can.createWebhookSubscription,
+        group: t("Integrations"),
+        icon: WebhooksIcon,
+      },
+      SelfHosted: {
+        name: t("Self Hosted"),
+        path: "/settings/integrations/self-hosted",
+        component: SelfHosted,
+        enabled: can.update,
+        group: t("Integrations"),
+        icon: BuildingBlocksIcon,
+      },
       Slack: {
         name: "Slack",
         path: "/settings/integrations/slack",
         component: Slack,
-        enabled: can.update && (!!env.SLACK_KEY || isHosted),
+        enabled: can.update && (!!env.SLACK_CLIENT_ID || isCloudHosted),
         group: t("Integrations"),
         icon: SlackIcon,
       },
@@ -171,12 +203,20 @@ const useAuthorizedSettingsConfig = () => {
         name: "Zapier",
         path: "/settings/integrations/zapier",
         component: Zapier,
-        enabled: can.update && isHosted,
+        enabled: can.update && isCloudHosted,
         group: t("Integrations"),
         icon: ZapierIcon,
       },
     }),
-    [can.createApiKey, can.export, can.manage, can.update, t]
+    [
+      t,
+      can.createApiKey,
+      can.update,
+      can.createImport,
+      can.createExport,
+      can.createWebhookSubscription,
+      team.collaborativeEditing,
+    ]
   );
 
   const enabledConfigs = React.useMemo(

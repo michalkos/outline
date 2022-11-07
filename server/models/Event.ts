@@ -12,7 +12,6 @@ import {
   DataType,
   Length,
 } from "sequelize-typescript";
-import { normalizeIP } from "@server/utils/ip";
 import { globalEventQueue } from "../queues";
 import { Event as TEvent } from "../types";
 import Collection from "./Collection";
@@ -50,6 +49,11 @@ class Event extends IdModel {
     if (model.ip) {
       // cleanup IPV6 representations of IPV4 addresses
       model.ip = model.ip.replace(/^::ffff:/, "");
+
+      // cleanup port from IPV4
+      if (model.ip.includes(".") && model.ip.includes(":")) {
+        model.ip = model.ip.split(":")[0];
+      }
     }
   }
 
@@ -57,7 +61,9 @@ class Event extends IdModel {
   static cleanupIpV4(model: Event) {
     if (model.ip) {
       // cleanup port from IPV4
-      model.ip = normalizeIP(model.ip);
+      if (model.ip.includes(".") && model.ip.includes(":")) {
+        model.ip = model.ip.split(":")[0];
+      }
     }
   }
 

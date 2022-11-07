@@ -33,7 +33,6 @@ import {
 import { stringToColor } from "@shared/utils/color";
 import env from "@server/env";
 import DeleteAttachmentTask from "@server/queues/tasks/DeleteAttachmentTask";
-import { normalizeIP } from "@server/utils/ip";
 import parseAttachmentIds from "@server/utils/parseAttachmentIds";
 import { ValidationError } from "../errors";
 import ApiKey from "./ApiKey";
@@ -590,11 +589,21 @@ class User extends ParanoidModel {
   static cleanupIpV4(model: User) {
     if (model.lastActiveIp) {
       // cleanup port from IPV4
-      model.lastActiveIp = normalizeIP(model.lastActiveIp);
+      if (
+        model.lastActiveIp.includes(".") &&
+        model.lastActiveIp.includes(":")
+      ) {
+        model.lastActiveIp = model.lastActiveIp.split(":")[0];
+      }
     }
     if (model.lastSignedInIp) {
       // cleanup port from IPV4
-      model.lastSignedInIp = normalizeIP(model.lastSignedInIp);
+      if (
+        model.lastSignedInIp.includes(".") &&
+        model.lastSignedInIp.includes(":")
+      ) {
+        model.lastSignedInIp = model.lastSignedInIp.split(":")[0];
+      }
     }
   }
 

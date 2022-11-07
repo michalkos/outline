@@ -6,7 +6,6 @@ import { getCookieDomain } from "@shared/utils/domains";
 import env from "@server/env";
 import Logger from "@server/logging/Logger";
 import { User, Event, Team, Collection, View } from "@server/models";
-import { normalizeIP } from "@server/utils/ip";
 
 /**
  * Parse and return the details from the "sessions" cookie in the request, if
@@ -59,7 +58,7 @@ export async function signIn(
   }
 
   // update the database when the user last signed in
-  await user.updateSignedIn(normalizeIP(ctx.request.ip));
+  await user.updateSignedIn(ctx.request.ip);
 
   // don't await event creation for a faster sign-in
   Event.create({

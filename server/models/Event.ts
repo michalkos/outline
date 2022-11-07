@@ -3,7 +3,6 @@ import {
   ForeignKey,
   AfterSave,
   BeforeCreate,
-  BeforeValidate,
   BelongsTo,
   Column,
   IsIP,
@@ -49,21 +48,6 @@ class Event extends IdModel {
     if (model.ip) {
       // cleanup IPV6 representations of IPV4 addresses
       model.ip = model.ip.replace(/^::ffff:/, "");
-
-      // cleanup port from IPV4
-      if (model.ip.includes(".") && model.ip.includes(":")) {
-        model.ip = model.ip.split(":")[0];
-      }
-    }
-  }
-
-  @BeforeValidate
-  static cleanupIpV4(model: Event) {
-    if (model.ip) {
-      // cleanup port from IPV4
-      if (model.ip.includes(".") && model.ip.includes(":")) {
-        model.ip = model.ip.split(":")[0];
-      }
     }
   }
 

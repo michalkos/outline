@@ -50,7 +50,7 @@ if (serviceNames.includes("collaboration")) {
 // This function will only be called once in the original process
 async function master() {
   await checkEnv();
-  checkPendingMigrations();
+  // checkPendingMigrations();
   await checkMigrations();
 
   if (env.TELEMETRY && env.ENVIRONMENT === "production") {
